@@ -67,16 +67,3 @@ my_departure_label      = "von prosozial losfahren"
 delay_shifts_my_time    = false              
 arrival_destination     = "Bad Ems West"
 arrival_offset_min      = 0
-
-[[routes]]
-id                      = "debug-grund"
-label                   = "🧪 Debug mit Grund"
-from_station            = "niederlahnstein"
-to_station              = "bademswest"
-scheduled_departure     = "17:24"
-line                    = "RB23"
-direction_contains      = "Nassau"
-check_window_before_min = 60
-check_window_after_min  = 30         # ← länger, damit Zug noch im Fenster ist
-alert_threshold_min     = 1
-active_days             = ["mo", "tu", "we", "th", "fr"]
