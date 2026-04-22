@@ -18,12 +18,22 @@ from __future__ import annotations
 import os
 import logging
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
+from messagecodes import MessageCode, lookup_code
 
 import requests
+
+# ------------------------------------------------------------------------------
+#  Zeitformat-Helfer
+# ------------------------------------------------------------------------------
+
+def parse_db_timestamp(ts: str) -> datetime:
+    """DB-Timestamp 'YYMMDDHHMM' als TZ-aware Berlin-Zeit parsen."""
+    naive = datetime.strptime(ts, "%y%m%d%H%M")
+    return naive.replace(tzinfo=BERLIN)
 
 # ------------------------------------------------------------------------------
 #  Konfiguration
@@ -51,12 +61,13 @@ class Stop:
     planned_departure: Optional[datetime]  # pt aus <dp>
     planned_platform: Optional[str]        # pp aus <dp>
     planned_path: list[str]                # ppth, aufgesplittet
+    arrival_messages: list["Message"] = field(default_factory=list)
+    departure_messages: list["Message"] = field(default_factory=list)
 
     @property
     def destination(self) -> Optional[str]:
         """Letzte Station im geplanten Weg = Zielbahnhof."""
         return self.planned_path[-1] if self.planned_path else None
-
 
 @dataclass
 class Change:
@@ -66,17 +77,96 @@ class Change:
     changed_departure: Optional[datetime]
     arrival_cancelled: bool
     departure_cancelled: bool
-
+    arrival_messages: list["Message"] = field(default_factory=list)
+    departure_messages: list["Message"] = field(default_factory=list)
 
 # ------------------------------------------------------------------------------
-#  Zeitformat-Helfer
+#  Message / Störungsmeldungen
 # ------------------------------------------------------------------------------
 
-def parse_db_timestamp(ts: str) -> datetime:
-    """DB-Timestamp 'YYMMDDHHMM' als TZ-aware Berlin-Zeit parsen."""
-    naive = datetime.strptime(ts, "%y%m%d%H%M")
-    return naive.replace(tzinfo=BERLIN)
+@dataclass
+class Message:
+    """Eine strukturierte Störungsmeldung aus einem <m>-Element.
 
+    Die DB-API liefert pro Stop-Event (ar/dp) keine oder mehrere <m>-Elemente.
+    Wir reichen sie als Liste weiter und lassen den Konsumenten entscheiden,
+    welche am relevantesten ist.
+    """
+    code: str                       # Raw-Code aus dem XML, z.B. "95"
+    type: Optional[str] = None      # "h" (HIM), "q" (Quality), ...
+    category: Optional[str] = None  # roher 'cat'-Wert aus dem XML
+    timestamp: Optional[datetime] = None  # ts
+    external_text: Optional[str] = None   # 'ext'-Attribut, wenn vorhanden
+
+    @property
+    def resolved(self) -> MessageCode:
+        """Code-Lookup in messagecodes.toml."""
+        return lookup_code(self.code)
+
+
+def parse_message_elements(parent: Optional[ET.Element]) -> list[Message]:
+    """Extrahiert alle <m>-Elemente aus einem <ar> oder <dp>.
+
+    Args:
+        parent: Das <ar>- oder <dp>-Element (oder None, dann leere Liste).
+
+    Returns:
+        Liste von Message-Objekten in Reihenfolge des XML-Dokuments.
+    """
+    if parent is None:
+        return []
+
+    messages: list[Message] = []
+    for m in parent.findall("m"):
+        ts_raw = m.get("ts")
+        ts_parsed = None
+        if ts_raw:
+            try:
+                ts_parsed = parse_db_timestamp(ts_raw)
+            except ValueError:
+                # Defensive: manchmal weicht das ts-Format minimal ab
+                pass
+
+        messages.append(Message(
+            code=m.get("c", ""),
+            type=m.get("t"),
+            category=m.get("cat"),
+            timestamp=ts_parsed,
+            external_text=m.get("ext"),
+        ))
+
+    return messages
+
+
+def primary_reason(messages: list[Message]) -> Optional[Message]:
+    """Wählt aus einer Liste von Messages die 'beste' als Haupt-Grund.
+
+    Heuristik:
+      1. Bevorzugt bekannte Codes vor unbekannten
+      2. Innerhalb der bekannten: höhere Severity schlägt niedrigere
+      3. Bei Gleichstand: die erste im Dokument
+
+    Returns:
+        Die relevanteste Message oder None, falls Liste leer.
+    """
+    if not messages:
+        return None
+
+    severity_rank = {
+        "critical": 4,
+        "high":     3,
+        "medium":   2,
+        "low":      1,
+        "unknown":  0,
+    }
+
+    def score(msg: Message) -> tuple[int, int]:
+        resolved = msg.resolved
+        is_known = 1 if resolved.is_known else 0
+        sev = severity_rank.get(resolved.severity, 0)
+        return (is_known, sev)
+
+    return max(messages, key=score)
 
 # ------------------------------------------------------------------------------
 #  API-Client
@@ -148,11 +238,9 @@ class DBClient:
             ar = s.find("ar")
             dp = s.find("dp")
 
-            # Ohne tl-Element können wir den Zug nicht identifizieren
             if tl is None:
                 continue
 
-            # ppth immer aus <dp> ziehen (wenn vorhanden), sonst <ar>
             ppth_source = dp if dp is not None else ar
             ppth = ppth_source.get("ppth", "") if ppth_source is not None else ""
 
@@ -165,6 +253,9 @@ class DBClient:
                 planned_departure=parse_db_timestamp(dp.get("pt")) if dp is not None and dp.get("pt") else None,
                 planned_platform=(dp.get("pp") if dp is not None else None),
                 planned_path=ppth.split("|") if ppth else [],
+                # NEU:
+                arrival_messages=parse_message_elements(ar),
+                departure_messages=parse_message_elements(dp),
             ))
 
         return stops
@@ -184,6 +275,9 @@ class DBClient:
                 changed_departure=parse_db_timestamp(dp.get("ct")) if dp is not None and dp.get("ct") else None,
                 arrival_cancelled=(ar is not None and ar.get("cs") == "c"),
                 departure_cancelled=(dp is not None and dp.get("cs") == "c"),
+                # NEU:
+                arrival_messages=parse_message_elements(ar),
+                departure_messages=parse_message_elements(dp),
             )
 
         return changes

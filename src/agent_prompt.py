@@ -53,6 +53,9 @@ def build_agent_prompt(
     situation_lines = [f"Status: {status}"]
     if delay > 0:
         situation_lines.append(f"Verspätung: {delay} Min")
+    # Grund, wenn bekannt (sonst leaves den Prompt unverstört)
+    if result.delay_reason is not None and result.delay_reason.resolved.is_known:
+        situation_lines.append(f"Verspätungsgrund: {result.delay_reason.resolved.text}")
     if my_dep_str:
         situation_lines.append(f"Geplanter Aufbruch: {my_dep_str} ({my_dep_label})")
         if new_dep_str and delay_shifts:

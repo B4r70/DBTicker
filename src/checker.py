@@ -21,9 +21,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from enum import Enum
-from typing import Optional
 
-from db_client import DBClient, Stop, Change
+# Message und primary_reason mitnehmen:
+from typing import Optional
+from db_client import Stop, Change, Message, primary_reason, parse_db_timestamp
 
 # ------------------------------------------------------------------------------
 #  Konfiguration
@@ -59,6 +60,7 @@ class RouteCheckResult:
     actual_departure: Optional[datetime] = None
     delay_minutes: int = 0
     planned_platform: Optional[str] = None
+    delay_reason: Optional[Message] = None
     # ... weitere Felder später bei Bedarf
 
     @property
@@ -122,6 +124,28 @@ def find_matching_train(
 
     return None
 
+# ------------------------------------------------------------------------------------------
+#  Delay Reasons
+# ------------------------------------------------------------------------------------------
+
+def _pick_delay_reason(train: Stop, change: Optional[Change]) -> Optional[Message]:
+    """Sammelt alle <m>-Messages aus Plan und Changes und wählt die wichtigste.
+
+    Zieht sowohl arrival- als auch departure-Messages heran und lässt
+    primary_reason() nach Severity entscheiden.
+    """
+    all_messages: list[Message] = []
+
+    # Plan-seitig (selten, aber möglich — z.B. bei HIM-Meldungen)
+    all_messages.extend(train.arrival_messages)
+    all_messages.extend(train.departure_messages)
+
+    # Change-seitig (hier sind die echten Verspätungsgründe)
+    if change is not None:
+        all_messages.extend(change.arrival_messages)
+        all_messages.extend(change.departure_messages)
+
+    return primary_reason(all_messages)
 # ------------------------------------------------------------------------------
 #  Status-Berechnung
 # ------------------------------------------------------------------------------
@@ -150,17 +174,19 @@ def compute_status(train: Stop, changes: dict[str, Change]) -> RouteCheckResult:
 
     # --- Ist der Zug in den Changes? ---
     change = changes.get(train.stop_id)
-
     if change is None:
         # Kein Eintrag → keine Abweichung → pünktlich
         result.status = TrainStatus.ON_TIME
         result.actual_departure = train.planned_departure
         result.delay_minutes = 0
+        # Pünktlich, aber trotzdem könnten Plan-Messages da sein (selten)
+        result.delay_reason = _pick_delay_reason(train, change=None)
         return result
 
     # --- Ausfall hat Vorrang vor Verspätung ---
     if change.departure_cancelled or change.arrival_cancelled:
         result.status = TrainStatus.CANCELLED
+        result.delay_reason = _pick_delay_reason(train, change=change)
         return result
 
     # --- Verspätung berechnen ---
@@ -168,14 +194,13 @@ def compute_status(train: Stop, changes: dict[str, Change]) -> RouteCheckResult:
         delay = (change.changed_departure - train.planned_departure).total_seconds() / 60
         result.delay_minutes = int(round(delay))
         result.actual_departure = change.changed_departure
-
-        # delay_minutes kann theoretisch negativ sein (Zug früher als geplant?) — 
-        # behandeln wir als pünktlich, weil's praktisch nie vorkommt und
-        # wenn doch, willst du keinen Alert.
         if result.delay_minutes > 0:
             result.status = TrainStatus.DELAYED
         else:
             result.status = TrainStatus.ON_TIME
+
+    # --- Grund ermitteln (in allen Fällen, auch on_time mit Messages) ---
+    result.delay_reason = _pick_delay_reason(train, change=change)
 
     return result
 

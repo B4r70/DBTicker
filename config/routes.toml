@@ -68,24 +68,15 @@ delay_shifts_my_time    = false
 arrival_destination     = "Bad Ems West"
 arrival_offset_min      = 0
 
-# -------------------------------------------------------------------------------------------
-# - Vorgaben für die Rückfahrt am Nachmittag
-# -------------------------------------------------------------------------------------------
 [[routes]]
-id                      = "debug-state"
-label                   = "🚆 Abends: Niederlahnstein → Bad Ems West (16:16)"
+id                      = "debug-grund"
+label                   = "🧪 Debug mit Grund"
 from_station            = "niederlahnstein"
 to_station              = "bademswest"
-scheduled_departure     = "14:16"
+scheduled_departure     = "17:24"
 line                    = "RB23"
 direction_contains      = "Nassau"
-check_window_before_min = 30
-check_window_after_min  = 5
-alert_threshold_min     = 3
+check_window_before_min = 60
+check_window_after_min  = 30         # ← länger, damit Zug noch im Fenster ist
+alert_threshold_min     = 1
 active_days             = ["mo", "tu", "we", "th", "fr"]
-# -- Bezug zum Tagesablauf für intelligentere Rückmeldungen
-my_departure_time       = "14:05"             
-my_departure_label      = "von prosozial losfahren"
-delay_shifts_my_time    = false              
-arrival_destination     = "Bad Ems West"
-arrival_offset_min      = 0

@@ -160,6 +160,11 @@ def build_telegram_html(
     if to_station_name and result.status != TrainStatus.CANCELLED:
         lines.append(f"<b>Aussteigen:</b> {to_station_name}")
 
+    # --- Verspätungsgrund (nur wenn bekannt, sonst weglassen) ---
+    if result.delay_reason is not None and result.delay_reason.resolved.is_known:
+        reason_text = result.delay_reason.resolved.text
+        lines.append(f"<b>Grund:</b> {_escape_html(reason_text)}")
+
     # --- Agent-Satz ---
     if agent_sentence:
         lines.append("")
