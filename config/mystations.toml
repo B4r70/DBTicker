@@ -1,0 +1,25 @@
+# ==========================================================================================
+#  BartoAI / DBTicker — Bekannte Stationen
+# ==========================================================================================
+#  Source  : deutsche-bahn-api / StationHelper (Offline-Cache)
+#  Update  : python tools/find_station.py <Name>  (--add <key> für direktes Speichern)
+#  Format  : Schlüssel = lowercase_with_underscores, frei wählbar
+# ==========================================================================================
+#
+[stations.bademswest]
+eva = 8000702
+name = "Bad Ems West"
+ds100 = "FEMW"
+verkehr = "RV"
+lat = 50.330694
+lon = 7.706039
+note = ""
+
+[stations.niederlahnstein]
+eva = 8000278
+name = "Niederlahnstein"
+ds100 = "KNL"
+verkehr = "RV"
+lat = 50.31639
+lon = 7.599503
+note = ""

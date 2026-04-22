@@ -1,0 +1,14 @@
+# /etc/systemd/system/dbticker.service
+[Unit]
+Description=dbticker — DB-Verbindung-Überwachung
+After=network-online.target openclaw.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=barto
+WorkingDirectory=/home/barto/developments/projects/dbticker
+ExecStart=/var/lib/openclaw/skills/dbticker/dbticker.sh run
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dbticker

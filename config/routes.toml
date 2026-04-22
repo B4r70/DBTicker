@@ -1,0 +1,69 @@
+# ==========================================================================================
+#  BartoAI / DBTicker — Pendel-Routen
+# ==========================================================================================
+#  Source  : Manuell gepflegt
+#  Refs    : from_station / to_station → Keys aus mystations.toml
+# ==========================================================================================
+
+# -------------------------------------------------------------------------------------------
+# - Feld-Referenz
+# -------------------------------------------------------------------------------------------
+# id                       - Eindeutige ID für State-Files und Logs
+# label                    - Menschenlesbare Beschreibung (für Telegram)
+# from_station             - Station-Key (siehe mystations.toml)
+# to_station               - Station-Key (siehe mystations.toml)
+# scheduled_departure      - Planmäßige Abfahrt "HH:MM" (lokal, Europe/Berlin)
+# check_window_before_min  - Wie viele Minuten vor Abfahrt beginnt das Checken?
+# check_window_after_min   - Wie viele Minuten nach Abfahrt hört es auf?
+# alert_threshold_min      - Ab welcher Verspätung wird gepingt?
+# active_days              - ["mo", "tu", "we", "th", "fr", "sa", "su"]
+# my_departure_time        - Ab wann starte ich von Zuhause
+# my_departure_label       - Label für die Meldung über Telegram
+# delay_shifts_my_time     - Im Falle einer Verspätung meine Zeit verschieben
+# arrival_destination      - Wo komme ich tatsächlich an? (für intelligentere Meldungen)
+# arrival_offset_min       - Minuten von Zugabkommen bis "vor Ort" (für intelligent
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Morgen
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id                      = "hin-0631"
+label                   = "🚆 Morgens: Bad Ems West → Niederlahnstein (06:31)"
+from_station            = "bademswest"
+to_station              = "niederlahnstein"
+scheduled_departure     = "06:31"
+line                    = "RB23"
+direction_contains      = "Koblenz"
+check_window_before_min = 30
+check_window_after_min  = 5
+alert_threshold_min     = 3
+active_days             = ["mo", "tu", "we", "th", "fr"]
+# -- Bezug zum Tagesablauf für intelligentere Rückmeldungen
+my_departure_time       = "06:10"            
+my_departure_label      = "Los"        
+delay_shifts_my_time    = true         
+arrival_destination     = "prosozial (Niederlahnstein)" 
+arrival_offset_min      = 12             
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Nachmittag
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id                      = "zurueck-1616"
+label                   = "🚆 Abends: Niederlahnstein → Bad Ems West (16:16)"
+from_station            = "niederlahnstein"
+to_station              = "bademswest"
+scheduled_departure     = "16:16"
+line                    = "RB23"
+direction_contains      = "Nassau"
+check_window_before_min = 30
+check_window_after_min  = 5
+alert_threshold_min     = 3
+active_days             = ["mo", "tu", "we", "th", "fr"]
+# -- Bezug zum Tagesablauf für intelligentere Rückmeldungen
+my_departure_time       = "16:05"             
+my_departure_label      = "von prosozial losfahren"
+delay_shifts_my_time    = false              
+arrival_destination     = "Bad Ems West"
+arrival_offset_min      = 0

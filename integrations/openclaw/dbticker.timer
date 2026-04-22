@@ -1,0 +1,15 @@
+# /etc/systemd/system/dbticker.timer
+[Unit]
+Description=dbticker — alle 5 Min prüfen
+Requires=dbticker.service
+
+[Timer]
+# Alle 5 Minuten: xx:00, xx:05, xx:10, ...
+OnCalendar=*:0/5
+# Falls Server schlief und Termin verpasst: beim Start nachholen
+Persistent=true
+# Randomisiert um 30 Sek, damit nicht alle Timer gleichzeitig feuern
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target
