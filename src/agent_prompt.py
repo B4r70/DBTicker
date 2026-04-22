@@ -13,80 +13,75 @@
 # ==========================================================================================
 #
 from __future__ import annotations
-from datetime import datetime, timedelta
-from checker import RouteCheckResult
 
-# ------------------------------------------------------------------------------
-#  Aufbereitung der LLM Ausgabe in Telegram
-# ------------------------------------------------------------------------------
+from datetime import datetime, timedelta
+
+from checker import RouteCheckResult, TrainStatus
+
+# ------------------------------------------------------------------------------------------
+#  Agent Prompt aufbereiten
+# ------------------------------------------------------------------------------------------
 
 def build_agent_prompt(
     result: RouteCheckResult,
     reason: str,
     route: dict,
 ) -> str:
-    """Baut den Prompt, den wir an OpenClaw schicken.
+    """Prompt, der den Agent EINEN Satz mit Tagesablauf-Bezug liefern lässt.
 
-    Der Agent formuliert daraus die finale Telegram-Nachricht.
-    Wir geben ihm strukturierten Kontext mit Tagesablauf-Bezug —
-    damit die Meldungen NUTZER-zentriert klingen, nicht zug-zentriert.
+    Der Agent bekommt nur die abstrakte Situation, keine Daten zum Formatieren.
+    Alle technischen Infos (Uhrzeiten, Gleis, Zugnummer) baut Python im
+    HTML-Template selbst ein — der Agent ergänzt nur eine persönliche Note.
     """
     status = result.status.value
     delay = result.delay_minutes
 
+    # Tagesablauf-Felder aus der Route
     my_dep_str = route.get("my_departure_time", "")
     my_dep_label = route.get("my_departure_label", "losfahren")
-    arrival_dest = route.get("arrival_destination", result.destination or "")
     delay_shifts = route.get("delay_shifts_my_time", True)
 
-    today = datetime.now()
-    my_dep_dt = None
-    if my_dep_str:
+    # Verschobene Aufbruchszeit berechnen (falls relevant)
+    new_dep_str = None
+    if my_dep_str and delay_shifts and delay > 0:
         hh, mm = my_dep_str.split(":")
-        my_dep_dt = today.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+        today = datetime.now()
+        new_dep_dt = today.replace(hour=int(hh), minute=int(mm)) + timedelta(minutes=delay)
+        new_dep_str = new_dep_dt.strftime("%H:%M")
 
-    new_my_dep_dt = my_dep_dt
-    if my_dep_dt and delay_shifts and delay > 0:
-        new_my_dep_dt = my_dep_dt + timedelta(minutes=delay)
+    # Situation-Beschreibung für den Agent
+    situation_lines = [f"Status: {status}"]
+    if delay > 0:
+        situation_lines.append(f"Verspätung: {delay} Min")
+    if my_dep_str:
+        situation_lines.append(f"Geplanter Aufbruch: {my_dep_str} ({my_dep_label})")
+        if new_dep_str and delay_shifts:
+            situation_lines.append(f"Neuer Aufbruch wegen Verspätung: {new_dep_str}")
+        elif delay > 0 and not delay_shifts:
+            situation_lines.append("Aufbruch bleibt gleich (warte am Bahnhof)")
 
-    lines = [
-        "Du bist der DB-Ticker für Bartosz. Verfasse eine kurze, klare Telegram-Nachricht.",
-        "WICHTIG: Schreibe NUTZER-zentriert, nicht zug-zentriert.",
-        "Sprich Bartosz direkt an, beziehe dich auf SEINEN Tagesablauf.",
-        "Maximal 2-3 Zeilen. Direkt, freundlich, ADHS-friendly. KEIN Preamble.",
-        "",
-        "── Kontext ──",
-        f"Route: {result.route_label}",
-        f"Bartosz fährt normalerweise um {my_dep_str} Uhr {my_dep_label}.",
-    ]
+    situation_lines.append(f"Anlass: {reason}")
 
-    if arrival_dest:
-        lines.append(f"Ziel: {arrival_dest}")
+    situation_block = "\n".join(f"  {line}" for line in situation_lines)
 
-    lines += [
-        "",
-        "── Status ──",
-        f"Zug-Status: {status}",
-        f"Soll-Abfahrt: {result.planned_departure.strftime('%H:%M') if result.planned_departure else '—'}",
-        f"Ist-Abfahrt:  {result.actual_departure.strftime('%H:%M') if result.actual_departure else '—'}",
-        f"Verspätung: {delay} Min",
-    ]
+    return f"""Du erstellst EINEN einzigen kurzen Satz auf Deutsch für Bartosz.
 
-    if my_dep_dt:
-        lines.append(f"Bartos' geplanter Aufbruch: {my_dep_dt.strftime('%H:%M')}")
-        if new_my_dep_dt and new_my_dep_dt != my_dep_dt:
-            lines.append(f"Bartos' NEUER Aufbruch: {new_my_dep_dt.strftime('%H:%M')} (verschoben um {delay} Min)")
+WICHTIG:
+- Genau EIN Satz, maximal 15 Wörter.
+- Kein Zug-Jargon, kein "RB23", keine Uhrzeiten (die hat Python schon im Template).
+- Auf den Tagesablauf bezogen, nicht auf den Zug.
+- ADHS-friendly: direkt, klar, freundlich.
+- Kein Preamble, kein "Ich denke", nur der Satz selbst.
+- Keine Emojis, kein Markdown, keine Formatierung.
 
-    lines += [
-        "",
-        f"Grund für diese Nachricht: {reason}",
-        "",
-        "── Anweisungen für die Nachricht ──",
-        "- Bei All-Clear: 'Du kannst wie geplant um XX:XX [Aktion]. Zug pünktlich.'",
-        "- Bei Verspätung MIT delay_shifts: 'Du kannst X Min später [Aktion]. Neuer Aufbruch: XX:XX.'",
-        "- Bei Verspätung OHNE delay_shifts: 'Zug X Min verspätet. Du fährst trotzdem um XX:XX zum Bahnhof.'",
-        "- Bei Ausfall: 'Achtung: Zug fällt aus. Schau in DB Navigator nach Alternative.'",
-        "- Bei Entwarnung: 'Aktualisierung: Zug doch wieder pünktlich. Geplanter Aufbruch um XX:XX gilt.'",
-    ]
+Situation:
+{situation_block}
 
-    return "\n".join(lines)
+Beispiele für guten Output:
+- "Du kannst wie geplant starten, alles entspannt."
+- "Nimm dir noch 8 Minuten extra — kein Stress."
+- "Plan B nötig, schau kurz in den DB Navigator."
+- "Alles wieder gut, Ursprungsplan bleibt."
+- "Normale Abfahrt, der Tag beginnt wie vorgesehen."
+
+Antworte NUR mit dem Satz. Nichts davor, nichts dahinter."""

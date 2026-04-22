@@ -28,9 +28,10 @@ from dotenv import load_dotenv
 
 from checker import RouteCheckResult, TrainStatus, check_route
 from db_client import DBClient
-from notifier import notify_via_openclaw
 from state import RouteState, decide_notification, state_path_for
 from agent_prompt import build_agent_prompt
+from notifier import notify
+from logging_setup import configure_logging
 
 # ------------------------------------------------------------------------------
 #  Konfiguration
@@ -47,13 +48,7 @@ BERLIN = ZoneInfo("Europe/Berlin")
 #  Logging Setup (gibt alles an stdout → systemd fängt's via journal)
 # ------------------------------------------------------------------------------
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger("dbticker")
-
+logger = configure_logging()
 
 # ------------------------------------------------------------------------------
 #  Config-Laden
@@ -151,8 +146,24 @@ def process_route(
 
     # --- Notifier ggf. aufrufen ---
     if decision.should_notify:
+        # Agent-Prompt (für den Satz) bauen
         prompt = build_agent_prompt(result, decision.reason, route)
-        success = notify_via_openclaw(prompt, name=f"dbticker-{route_id}")
+
+        # Station-Namen für das HTML-Template nachschlagen
+        from_station_name = stations.get(route["from_station"], {}).get(
+            "name", route["from_station"]
+        )
+        to_station_name = stations.get(route["to_station"], {}).get(
+            "name", route["to_station"]
+        )
+
+        success = notify(
+            result,
+            agent_prompt=prompt,
+            from_station_name=from_station_name,
+            to_station_name=to_station_name,
+        )
+
         if not success:
             # Bei Fehlschlag State NICHT mit notification_count+1 speichern,
             # damit beim nächsten Lauf nochmal versucht wird.

@@ -22,3 +22,9 @@ state/*.json
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# --- Runtime / Logs ---
+state/*.json
+!state/.gitkeep
+log/*.log
+!log/.gitkeep

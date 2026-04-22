@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,6 +30,9 @@ import requests
 # ------------------------------------------------------------------------------
 
 API_BASE = "https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1"
+
+logger = logging.getLogger(__name__)
+
 BERLIN = ZoneInfo("Europe/Berlin")
 
 # ------------------------------------------------------------------------------
@@ -93,34 +97,40 @@ class DBClient:
         }
 
     def fetch_plan(self, eva: int, at: datetime) -> list[Stop]:
-        """Soll-Fahrplan für eine bestimmte Stunde an einer Station.
-
-        Args:
-            eva: Station-EVA-Nummer.
-            at: Stunde, für die geplant werden soll (Minuten/Sekunden werden ignoriert).
-
-        Returns:
-            Liste aller geplanten Stops in dieser Stunde.
-        """
         date_str = at.strftime("%y%m%d")
         hour_str = at.strftime("%H")
         url = f"{API_BASE}/plan/{eva}/{date_str}/{hour_str}"
 
+        logger.debug("fetch_plan: GET %s", url)
+
         r = requests.get(url, headers=self._headers(), timeout=10)
         r.raise_for_status()
+
+        logger.debug(
+            "fetch_plan response (status=%d, bytes=%d, ratelimit_remaining=%s):\n%s",
+            r.status_code,
+            len(r.text),
+            r.headers.get("X-RateLimit-Remaining", "?"),
+            r.text,
+        )
 
         return self._parse_plan(r.text)
 
     def fetch_changes(self, eva: int) -> dict[str, Change]:
-        """Alle aktuellen Änderungen (Verspätungen, Ausfälle) an einer Station.
-
-        Returns:
-            Mapping stop_id → Change.
-        """
         url = f"{API_BASE}/fchg/{eva}"
+
+        logger.debug("fetch_changes: GET %s", url)
 
         r = requests.get(url, headers=self._headers(), timeout=10)
         r.raise_for_status()
+
+        logger.debug(
+            "fetch_changes response (status=%d, bytes=%d, ratelimit_remaining=%s):\n%s",
+            r.status_code,
+            len(r.text),
+            r.headers.get("X-RateLimit-Remaining", "?"),
+            r.text,
+        )
 
         return self._parse_changes(r.text)
 
