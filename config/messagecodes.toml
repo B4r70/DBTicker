@@ -1,0 +1,344 @@
+# ===========================================================================================
+#  # BartoAI
+# ===========================================================================================
+#  Bereich . . . : Tooling/DBTicker
+#  Datei . . . . : messagecodes.toml
+#  Autor . . . . : Bartosz Stryjewski
+#  Erstellt am . : 22.04.2026
+# ------------------------------------------------------------------------------------------
+#  Beschreibung  : DB Timetables API Messagecodes
+# ------------------------------------------------------------------------------------------
+#  Severity-Logik (eigene Heuristik, nicht von der DB):
+#    critical — Gefährliches Ereignis, Totalausfall, Strecken dicht
+#    high     — Längere Verzögerungen wahrscheinlich (Oberleitung, Weichen,
+#               Polizei, Notarzt, Tür, Streik, Witterung extrem)
+#    medium   — Planbare Verspätung (Personal, Disposition, Zugfolge)
+#    low      — Kurze/geringe Verspätung (Reisendenverhalten, Ladearbeiten)
+# ------------------------------------------------------------------------------------------
+#  (C) Copyright 2026 Bartosz Stryjewski
+#  All rights reserved
+# ===========================================================================================
+#
+# ------------------------------------------------------------------------------
+#  10-19  Betriebsplanung / Betriebsführung DB InfraGO
+# ------------------------------------------------------------------------------
+
+[codes.10]
+text     = "Fahrplanerstellung"
+category = "infrago_planning"
+severity = "low"
+
+[codes.12]
+text     = "Fehldisposition"
+category = "infrago_planning"
+severity = "medium"
+
+[codes.13]
+text     = "Vorbereitungsunregelmäßigkeit"
+category = "infrago_planning"
+severity = "low"
+
+[codes.14]
+text     = "Anfangsverspätung DB InfraGO-Zug"
+category = "infrago_planning"
+severity = "medium"
+
+[codes.18]
+text     = "Betriebliches Personal DB InfraGO"
+category = "infrago_personnel"
+severity = "medium"
+
+[codes.19]
+text     = "Sonstige Betriebsdurchführung DB InfraGO"
+category = "infrago_planning"
+severity = "low"
+
+
+# ------------------------------------------------------------------------------
+#  20-29  Infrastruktur-Technik
+# ------------------------------------------------------------------------------
+
+[codes.20]
+text     = "Stromversorgungsanlagen (Fahrstrom)"
+category = "infrastructure"
+severity = "high"
+
+[codes.21]
+text     = "Telekommunikationsanlagen"
+category = "infrastructure"
+severity = "medium"
+
+[codes.22]
+text     = "Bauwerke (Brücken, Tunnel)"
+category = "infrastructure"
+severity = "high"
+
+[codes.23]
+text     = "Fahrbahn"
+category = "infrastructure"
+severity = "high"
+
+[codes.24]
+text     = "Bahnübergangsanlagen"
+category = "infrastructure"
+severity = "medium"
+
+[codes.25]
+text     = "Leit- und Sicherungstechnik (Signal)"
+category = "infrastructure"
+severity = "high"
+
+[codes.26]
+text     = "Weichen"
+category = "infrastructure"
+severity = "high"
+
+[codes.27]
+text     = "Fahrzeuge DB InfraGO"
+category = "infrastructure"
+severity = "medium"
+
+[codes.28]
+text     = "Technisches Personal DB InfraGO"
+category = "infrago_personnel"
+severity = "medium"
+
+[codes.29]
+text     = "Sonstige Technik DB InfraGO"
+category = "infrastructure"
+severity = "low"
+
+
+# ------------------------------------------------------------------------------
+#  30-32  Bauliche Gründe
+# ------------------------------------------------------------------------------
+
+[codes.30]
+text     = "Mängellangsamfahrstelle"
+category = "construction"
+severity = "medium"
+
+[codes.31]
+text     = "Bauarbeiten / Arbeiten"
+category = "construction"
+severity = "medium"
+
+[codes.32]
+text     = "Unregelmäßigkeit bei Bauarbeiten"
+category = "construction"
+severity = "medium"
+
+
+# ------------------------------------------------------------------------------
+#  40-49  Andere Infrastruktur (Nachbar-EIU, DB Energie, Bahnhöfe)
+# ------------------------------------------------------------------------------
+
+[codes.40]
+text     = "Nächster Infrastruktur-Unternehmer"
+category = "other_infra"
+severity = "medium"
+
+[codes.41]
+text     = "Vorheriger Infrastruktur-Unternehmer"
+category = "other_infra"
+severity = "medium"
+
+[codes.46]
+text     = "Anlagen DB Energie"
+category = "infrastructure"
+severity = "high"
+
+[codes.47]
+text     = "Anlagen Personenbahnhöfe"
+category = "station"
+severity = "low"
+
+[codes.48]
+text     = "Personal Bahnhöfe / DB Energie"
+category = "station"
+severity = "low"
+
+[codes.49]
+text     = "Sonstiges Bahnhöfe / DB Energie"
+category = "station"
+severity = "low"
+
+
+# ------------------------------------------------------------------------------
+#  50-59  EVU kommerzielle Ursachen
+# ------------------------------------------------------------------------------
+
+[codes.50]
+text     = "Haltezeitüberschreitung (Reisendenaufkommen)"
+category = "evu_commercial"
+severity = "low"
+
+[codes.51]
+text     = "Antrag EVU"
+category = "evu_commercial"
+severity = "low"
+
+[codes.52]
+text     = "Ladearbeiten"
+category = "evu_commercial"
+severity = "low"
+
+[codes.53]
+text     = "Unregelmäßigkeit an der Ladung"
+category = "evu_commercial"
+severity = "low"
+
+[codes.54]
+text     = "Verkehrliche Zugvorbereitung EVU"
+category = "evu_commercial"
+severity = "medium"
+
+[codes.57]
+text     = "Keine Meldung durch EVU"
+category = "evu_commercial"
+severity = "low"
+
+[codes.58]
+text     = "Verkehrliches Personal EVU"
+category = "evu_personnel"
+severity = "medium"
+
+[codes.59]
+text     = "Sonstige verkehrliche Gründe EVU"
+category = "evu_commercial"
+severity = "low"
+
+
+# ------------------------------------------------------------------------------
+#  60-69  Fahrzeuge / Fahrzeugpersonale EVU
+# ------------------------------------------------------------------------------
+
+[codes.60]
+text     = "Umlauf- / Einsatzplanung EVU"
+category = "evu_vehicle"
+severity = "medium"
+
+[codes.61]
+text     = "Zugbildung durch EVU"
+category = "evu_vehicle"
+severity = "medium"
+
+[codes.62]
+text     = "Reisezugwagen (Tür, Bordstrom, WC)"
+category = "evu_vehicle"
+severity = "medium"
+
+[codes.63]
+text     = "Güterwagen"
+category = "evu_vehicle"
+severity = "medium"
+
+[codes.64]
+text     = "Triebfahrzeug (Antrieb, Bremse, Technik)"
+category = "evu_vehicle"
+severity = "high"
+
+[codes.68]
+text     = "Technisches Personal EVU (Lokführer)"
+category = "evu_personnel"
+severity = "medium"
+
+[codes.69]
+text     = "Sonstige Fahrzeuge EVU"
+category = "evu_vehicle"
+severity = "medium"
+
+
+# ------------------------------------------------------------------------------
+#  70-71  Nachbar-EVU
+# ------------------------------------------------------------------------------
+
+[codes.70]
+text     = "Nächstes EVU"
+category = "other_evu"
+severity = "medium"
+
+[codes.71]
+text     = "Vorheriges EVU"
+category = "other_evu"
+severity = "medium"
+
+
+# ------------------------------------------------------------------------------
+#  80-89  Externe Einflüsse
+# ------------------------------------------------------------------------------
+
+[codes.80]
+text     = "Externe Einflüsse bei externen EIU"
+category = "external"
+severity = "medium"
+
+[codes.81]
+text     = "Streik"
+category = "external"
+severity = "critical"
+
+[codes.82]
+text     = "Außergewöhnliche Witterung"
+category = "external"
+severity = "high"
+
+[codes.83]
+text     = "Schmierfilm (schlüpfrige Schienen)"
+category = "external"
+severity = "medium"
+
+[codes.84]
+text     = "Behörden-/Rettungseinsatz"
+category = "external"
+severity = "high"
+
+[codes.85]
+text     = "Fremdeinwirkung (Personen/Tiere im Gleis)"
+category = "external"
+severity = "high"
+
+
+# ------------------------------------------------------------------------------
+#  90  Gefährliche Ereignisse
+# ------------------------------------------------------------------------------
+
+[codes.90]
+text     = "Gefährliches Ereignis"
+category = "dangerous_event"
+severity = "critical"
+
+
+# ------------------------------------------------------------------------------
+#  91-96  Sekundärgründe (Zugfolge, Umlauf, Anschluss)
+# ------------------------------------------------------------------------------
+
+[codes.91]
+text     = "Zugfolge (Vorrang anderer Züge)"
+category = "train_sequencing"
+severity = "low"
+
+[codes.92]
+text     = "Zugfolge (eigene Verspätung)"
+category = "train_sequencing"
+severity = "medium"
+
+[codes.93]
+text     = "Umlauf (wartender Anschlusszug)"
+category = "train_sequencing"
+severity = "medium"
+
+[codes.94]
+text     = "Anschluss-Aufnahme"
+category = "train_sequencing"
+severity = "low"
+
+[codes.95]
+text     = "Flügeln (Zugteilung/-vereinigung)"
+category = "train_sequencing"
+severity = "medium"
+
+[codes.96]
+text     = "Ursache in Untersuchung"
+category = "unknown"
+severity = "low"
