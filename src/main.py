@@ -20,6 +20,7 @@ import logging
 import sys
 import tomllib
 from datetime import datetime, timedelta
+from unittest import result
 from zoneinfo import ZoneInfo   # stdlib ab Python 3.9
 
 from pathlib import Path
@@ -135,10 +136,13 @@ def process_route(
     previous_state = RouteState.load(state_path)
 
     # --- Entscheidung ---
+    # Neu:
     decision = decide_notification(
         result,
         previous_state,
         alert_threshold_min=route["alert_threshold_min"],
+        all_clear_window_start_min=route.get("all_clear_window_start_min", 12),
+        all_clear_window_end_min=route.get("all_clear_window_end_min", 8),
     )
 
     logger.info("[%s] Entscheidung: notify=%s (%s)",

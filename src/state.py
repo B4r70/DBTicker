@@ -107,6 +107,8 @@ def decide_notification(
     previous_state: RouteState,
     *,
     alert_threshold_min: int,
+    all_clear_window_start_min: int = ALL_CLEAR_WINDOW_START_MIN,
+    all_clear_window_end_min: int = ALL_CLEAR_WINDOW_END_MIN,
 ) -> NotificationDecision:
     """Entscheidet, ob eine Notification verschickt werden soll.
 
@@ -192,7 +194,7 @@ def decide_notification(
         now = _dt.now(result.planned_departure.tzinfo)
         minutes_to_departure = (result.planned_departure - now).total_seconds() / 60
 
-        if ALL_CLEAR_WINDOW_END_MIN <= minutes_to_departure <= ALL_CLEAR_WINDOW_START_MIN:
+        if all_clear_window_end_min <= minutes_to_departure <= all_clear_window_start_min:
             new_state.last_reported_status = status.value
             new_state.last_reported_delay = 0
             new_state.all_clear_sent = True
