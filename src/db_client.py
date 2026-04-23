@@ -30,8 +30,14 @@ import requests
 #  Zeitformat-Helfer
 # ------------------------------------------------------------------------------
 
-def parse_db_timestamp(ts: str) -> datetime:
-    """DB-Timestamp 'YYMMDDHHMM' als TZ-aware Berlin-Zeit parsen."""
+def parse_db_timestamp(ts: Optional[str]) -> Optional[datetime]:
+    """DB-Timestamp 'YYMMDDHHMM' als TZ-aware Berlin-Zeit parsen.
+    
+    Gibt None zurück, wenn ts None oder leer ist.
+    Wirft ValueError bei falsch formatierten Strings.
+    """
+    if not ts:
+        return None
     naive = datetime.strptime(ts, "%y%m%d%H%M")
     return naive.replace(tzinfo=BERLIN)
 
@@ -46,9 +52,8 @@ logger = logging.getLogger(__name__)
 BERLIN = ZoneInfo("Europe/Berlin")
 
 # ------------------------------------------------------------------------------
-#  Datenklassen
+#  Datenklasse: Stop -> Geplanter Halt eines Zuges an einer Station
 # ------------------------------------------------------------------------------
-
 @dataclass
 class Stop:
     """Ein Halt eines Zuges an einer Station."""
@@ -69,6 +74,9 @@ class Stop:
         """Letzte Station im geplanten Weg = Zielbahnhof."""
         return self.planned_path[-1] if self.planned_path else None
 
+# ------------------------------------------------------------------------------------------
+#  Datenklasse: Änderungen zu einem Zug
+# ------------------------------------------------------------------------------------------
 @dataclass
 class Change:
     """Eine gemeldete Änderung zu einem Stop."""
@@ -81,9 +89,8 @@ class Change:
     departure_messages: list["Message"] = field(default_factory=list)
 
 # ------------------------------------------------------------------------------
-#  Message / Störungsmeldungen
+#  Datenklasse Message -> Störungsmeldungen der DB
 # ------------------------------------------------------------------------------
-
 @dataclass
 class Message:
     """Eine strukturierte Störungsmeldung aus einem <m>-Element.
@@ -103,7 +110,9 @@ class Message:
         """Code-Lookup in messagecodes.toml."""
         return lookup_code(self.code)
 
-
+# ------------------------------------------------------------------------------------------
+#  Parsing der Messagecodes (<m>-Elemente)
+# ------------------------------------------------------------------------------------------
 def parse_message_elements(parent: Optional[ET.Element]) -> list[Message]:
     """Extrahiert alle <m>-Elemente aus einem <ar> oder <dp>.
 
@@ -137,7 +146,9 @@ def parse_message_elements(parent: Optional[ET.Element]) -> list[Message]:
 
     return messages
 
-
+# ------------------------------------------------------------------------------------------
+#  Hauptursachen für Zugverspätungen
+# ------------------------------------------------------------------------------------------
 def primary_reason(messages: list[Message]) -> Optional[Message]:
     """Wählt aus einer Liste von Messages die 'beste' als Haupt-Grund.
 
@@ -249,8 +260,8 @@ class DBClient:
                 line=(dp.get("l") if dp is not None else ar.get("l") if ar is not None else "") or "",
                 train_category=tl.get("c", ""),
                 train_number=tl.get("n", ""),
-                planned_arrival=parse_db_timestamp(ar.get("pt")) if ar is not None and ar.get("pt") else None,
-                planned_departure=parse_db_timestamp(dp.get("pt")) if dp is not None and dp.get("pt") else None,
+                planned_arrival=parse_db_timestamp(ar.get("pt")) if ar is not None else None,
+                planned_departure=parse_db_timestamp(dp.get("pt")) if dp is not None else None,
                 planned_platform=(dp.get("pp") if dp is not None else None),
                 planned_path=ppth.split("|") if ppth else [],
                 # NEU:
@@ -271,8 +282,8 @@ class DBClient:
 
             changes[s.get("id", "")] = Change(
                 stop_id=s.get("id", ""),
-                changed_arrival=parse_db_timestamp(ar.get("ct")) if ar is not None and ar.get("ct") else None,
-                changed_departure=parse_db_timestamp(dp.get("ct")) if dp is not None and dp.get("ct") else None,
+                changed_arrival=parse_db_timestamp(ar.get("ct")) if ar is not None else None,
+                changed_departure=parse_db_timestamp(dp.get("ct")) if dp is not None else None,
                 arrival_cancelled=(ar is not None and ar.get("cs") == "c"),
                 departure_cancelled=(dp is not None and dp.get("cs") == "c"),
                 # NEU:
