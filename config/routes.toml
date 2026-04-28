@@ -51,7 +51,8 @@ my_departure_time          = "06:15"
 my_departure_label         = "mit dem E-Bike losfahren"
 delay_shifts_my_time       = true     # bei Verspätung: kannst später los
 arrival_destination        = "prosozial"
-arrival_offset_min         = 3        # 3 Min Rad von Niederlahnstein zu prosozial2             
+arrival_offset_min         = 3        # 3 Min Rad von Niederlahnstein zu prosozial2   
+max_delay_tracking_min     = 30          
 
 # -------------------------------------------------------------------------------------------
 # - Vorgaben für die Rückfahrt am Nachmittag
@@ -79,3 +80,4 @@ my_departure_label         = "prosozial verlassen"
 delay_shifts_my_time       = false    # Arbeitsende ist fix, Zug wartet am Bahnsteig
 arrival_destination        = "zu Hause"
 arrival_offset_min         = 0
+max_delay_tracking_min     = 60

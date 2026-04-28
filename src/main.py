@@ -20,7 +20,6 @@ import logging
 import sys
 import tomllib
 from datetime import datetime, timedelta
-from unittest import result
 from zoneinfo import ZoneInfo   # stdlib ab Python 3.9
 
 from pathlib import Path
@@ -79,14 +78,44 @@ def is_route_active_today(route: dict, now: datetime) -> bool:
     return today_key in route.get("active_days", [])
 
 
-def is_in_check_window(route: dict, now: datetime) -> bool:
+def is_in_check_window(
+    route: dict,
+    now: datetime,
+    *,
+    last_reported_delay_min: int = 0,
+) -> bool:
+    """Ist diese Route gerade im aktiven Check-Fenster?
+
+    Das Fenster bleibt nach hinten offen, solange der Zug noch nicht
+    abgefahren ist (basierend auf der zuletzt gemeldeten Verspätung).
+    Ein konfigurierbarer Hard-Cap (`max_delay_tracking_min`) verhindert,
+    dass der Ticker bei extremen Verspätungen oder unklaren Ausfällen
+    endlos weiterprüft.
+    """
     hh, mm = route["scheduled_departure"].split(":")
-    scheduled = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+    scheduled = now.replace(
+        hour=int(hh), minute=int(mm), second=0, microsecond=0
+    )
 
-    before = scheduled - timedelta(minutes=route["check_window_before_min"])
-    after = scheduled + timedelta(minutes=route["check_window_after_min"])
+    # Fenster-Start: feste Zeit vor geplanter Abfahrt
+    window_start = scheduled - timedelta(minutes=route["check_window_before_min"])
 
-    return before <= now <= after
+    # Fenster-Ende: nimmt das Maximum aus
+    #   - geplant + after_min  (Default-Verhalten)
+    #   - ist + after_min      (verschiebt sich mit Verspätung)
+    base_end = scheduled + timedelta(minutes=route["check_window_after_min"])
+    if last_reported_delay_min > 0:
+        delayed_end = base_end + timedelta(minutes=last_reported_delay_min)
+        window_end = max(base_end, delayed_end)
+    else:
+        window_end = base_end
+
+    # Hard-Cap: nie länger als max_delay_tracking_min nach geplanter Abfahrt
+    cap = scheduled + timedelta(minutes=route.get("max_delay_tracking_min", 30))
+    window_end = min(window_end, cap)
+
+    return window_start <= now <= window_end
+
 
 # ------------------------------------------------------------------------------
 #  Pro-Route-Verarbeitung
@@ -97,6 +126,8 @@ def process_route(
     route: dict,
     stations: dict[str, dict],
     now: datetime,
+    *,
+    previous_state: RouteState,
 ) -> None:
     """Eine einzelne Route durchprüfen und ggf. benachrichtigen."""
     route_id = route["id"]
@@ -131,12 +162,10 @@ def process_route(
     logger.info("[%s] Status: %s, Verspätung: %d Min",
                 route_id, result.status.value, result.delay_minutes)
 
-    # --- State laden ---
+    # --- State-Pfad für Speicherung (previous_state kommt als Parameter) ---
     state_path = state_path_for(route_id, now)
-    previous_state = RouteState.load(state_path)
 
     # --- Entscheidung ---
-    # Neu:
     decision = decide_notification(
         result,
         previous_state,
@@ -215,12 +244,18 @@ def main() -> int:
             logger.debug("[%s] Heute nicht aktiv (Wochentag).", route_id)
             continue
 
-        if not is_in_check_window(route, now):
+        # State laden, damit is_in_check_window die zuletzt gemeldete
+        # Verspätung kennt und das Fenster ggf. nach hinten verschiebt.
+        state_path = state_path_for(route_id, now)
+        previous_state = RouteState.load(state_path)
+        last_delay = previous_state.last_reported_delay or 0
+
+        if not is_in_check_window(route, now, last_reported_delay_min=last_delay):
             logger.debug("[%s] Außerhalb Check-Fenster.", route_id)
             continue
 
         active_count += 1
-        process_route(client, route, stations, now)
+        process_route(client, route, stations, now, previous_state=previous_state)
 
     logger.info("Fertig. %d Routen aktiv geprüft.", active_count)
     return 0
