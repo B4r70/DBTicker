@@ -15,6 +15,14 @@ lat = 50.330694
 lon = 7.706039
 note = ""
 
+[stations.badems]
+eva = 8000701
+name = "Bad Ems"
+ds100 = "FEMS"
+verkehr = "RV"
+lat = 50.327943
+lon = 7.728727
+
 [stations.niederlahnstein]
 eva = 8000278
 name = "Niederlahnstein"

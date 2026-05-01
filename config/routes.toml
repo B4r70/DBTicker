@@ -30,17 +30,17 @@
 # - Vorgaben für die Rückfahrt am Morgen
 # -------------------------------------------------------------------------------------------
 [[routes]]
-id                         = "hin-0631"
+id                         = "hin-0628"
 label                      = "🚆 Morgens Bad Ems → Koblenz"
-from_station               = "bademswest"
+from_station               = "badems"
 to_station                 = "niederlahnstein"
-scheduled_departure        = "06:31"
+scheduled_departure        = "06:28"
 line                       = "RB23"
 direction_contains         = "Koblenz"
 check_window_before_min    = 35
 check_window_after_min     = 5
 alert_threshold_min        = 3
-active_days                = ["mo", "tu", "we", "th", "fr"]
+active_days                = ["mo", "tu", "th", "fr"]
 
 # All-Clear-Fenster: 06:03–06:07 (Kaffee auf der Terrasse, Handy-Check)
 all_clear_window_start_min = 28
@@ -51,7 +51,7 @@ my_departure_time          = "06:15"
 my_departure_label         = "mit dem E-Bike losfahren"
 delay_shifts_my_time       = true     # bei Verspätung: kannst später los
 arrival_destination        = "prosozial"
-arrival_offset_min         = 3        # 3 Min Rad von Niederlahnstein zu prosozial2   
+arrival_offset_min         = 8        # 3 Min Rad von Niederlahnstein zu prosozial2   
 max_delay_tracking_min     = 30          
 
 # -------------------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ max_delay_tracking_min     = 30
 id                         = "zurueck-1616"
 label                      = "🚆 Abends Niederlahnstein → Bad Ems"
 from_station               = "niederlahnstein"
-to_station                 = "bademswest"
+to_station                 = "badems"
 scheduled_departure        = "16:16"
 line                       = "RB23"
 direction_contains         = "Nassau"

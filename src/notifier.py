@@ -5,10 +5,12 @@
 #  Datei . . . . : notifier.py
 #  Autor . . . . : Bartosz Stryjewski
 #  Erstellt am . : 21.04.2026
+#  Erweitert am .: 01.05.2026 (barto-link Backend als Alternative zu Telegram)
 # ------------------------------------------------------------------------------------------
-#  Beschreibung  : OpenClaw-Hook-Call zur Telegram-Zustellung.
-#                  Agent bekommt die Route-Info + Delay-Kontext und formuliert
-#                  daraus eine kompakte Nachricht für den User.
+#  Beschreibung  : Notify-Layer mit zwei austauschbaren Backends:
+#                    - "telegram"   → Telegram-Bot, HTML-Format
+#                    - "barto_link" → eigene iOS-App via push.barto.cloud
+#                  Auswahl per .env (NOTIFY_BACKEND).
 # ------------------------------------------------------------------------------------------
 #  (C) Copyright 2026 Bartosz Stryjewski
 #  All rights reserved
@@ -43,18 +45,7 @@ def request_agent_sentence(prompt: str, *, timeout: int = 30) -> Optional[str]:
     Der Hook wird mit deliver=false aufgerufen — der Agent antwortet synchron
     über die Session-History. Da der gesamte Request asynchron im Hintergrund
     läuft, müssen wir per Polling auf das Ergebnis warten.
-
-    HINWEIS: OpenClaw's /hooks/agent ist primär fire-and-forget. Für einen
-    synchronen Response nutzen wir hier den Fallback: wenn deliver=false ist,
-    wird die Antwort nicht verschickt, aber auch nicht direkt zurückgegeben.
-    In der Praxis nehmen wir stattdessen den direkten Ollama-Call — weil wir
-    Vollkontrolle brauchen.
     """
-    # FIXME: OpenClaw /hooks/agent gibt nur runId zurück, nicht die Antwort.
-    # Wir brauchen einen Endpoint, der synchron antwortet, oder eine andere
-    # Strategie. Siehe Hinweis weiter unten.
-
-    # Für den Moment: direkter Ollama-Call, weil das am kontrollierbarsten ist.
     return _call_ollama_for_sentence(prompt, timeout=timeout)
 
 
@@ -69,16 +60,14 @@ def _call_ollama_for_sentence(prompt: str, *, timeout: int) -> Optional[str]:
                 "stream": False,
                 "options": {
                     "temperature": 0.5,
-                    "num_predict": 60,   # max 60 Tokens
+                    "num_predict": 60,
                 },
             },
             timeout=timeout,
         )
         r.raise_for_status()
         text = r.json().get("response", "").strip()
-        # Defensive: Wenn mehrere Zeilen, nimm die erste
         first_line = text.split("\n")[0].strip()
-        # Quotes und führende Bindestriche entfernen
         first_line = first_line.strip('"').strip("'").lstrip("-").strip()
         logger.info("Agent-Satz: %s", first_line)
         return first_line or None
@@ -88,7 +77,7 @@ def _call_ollama_for_sentence(prompt: str, *, timeout: int) -> Optional[str]:
 
 
 # ------------------------------------------------------------------------------
-#  Stufe 2: HTML-Nachricht bauen
+#  Stufe 2: HTML-Nachricht bauen (Telegram)
 # ------------------------------------------------------------------------------
 
 # Status-Emojis und -Labels
@@ -106,20 +95,7 @@ def build_telegram_html(
     from_station_name: str,
     to_station_name: str,
 ) -> str:
-    """Baut die finale HTML-Nachricht für Telegram.
-
-    Struktur:
-      [Emoji] [Linie] [Status-Label]
-      [Optional: Verspätungs-Minuten]
-
-      Zug: [Zugnummer] nach [Ziel]
-      Abfahrt: [Zeit] (oder Soll→Ist) von [Station], Gleis [X]
-      Ankunft: [Zeit] [Zielbahnhof]            ← nur wenn to_station-Info vorhanden
-
-      [Agent-Satz]
-
-      Weitere Halte: [Liste]
-    """
+    """Baut die finale HTML-Nachricht für Telegram."""
     emoji, status_label = STATUS_PRESENTATION.get(
         result.status,
         ("❓", "unbekannt"),
@@ -127,18 +103,15 @@ def build_telegram_html(
     line = result.train_line or "?"
     delay = result.delay_minutes
 
-    # --- Headline ---
     headline_parts = [f"{emoji} <b>{line} {status_label}</b>"]
     if result.status == TrainStatus.DELAYED and delay > 0:
         headline_parts[0] = f"{emoji} <b>{line} {status_label}: +{delay} Min</b>"
 
     lines = [headline_parts[0], ""]
 
-    # --- Zug-Info ---
     if result.destination:
         lines.append(f"<b>Richtung:</b> {result.destination}")
 
-    # --- Abfahrt ---
     if result.planned_departure:
         soll = result.planned_departure.strftime("%H:%M")
         platform = f", Gleis {result.planned_platform}" if result.planned_platform else ""
@@ -156,24 +129,16 @@ def build_telegram_html(
         else:
             lines.append(f"<b>Abfahrt:</b> {soll} ({from_station_name}{platform})")
 
-    # --- Zielbahnhof-Hinweis ---
     if to_station_name and result.status != TrainStatus.CANCELLED:
         lines.append(f"<b>Aussteigen:</b> {to_station_name}")
 
-    # --- Verspätungsgrund (nur wenn bekannt, sonst weglassen) ---
     if result.delay_reason is not None and result.delay_reason.resolved.is_known:
         reason_text = result.delay_reason.resolved.text
         lines.append(f"<b>Grund:</b> {_escape_html(reason_text)}")
 
-    # --- Agent-Satz ---
     if agent_sentence:
         lines.append("")
         lines.append(f"<i>{_escape_html(agent_sentence)}</i>")
-
-    # --- Weitere Halte ---
-    if result.status != TrainStatus.CANCELLED and hasattr(result, "_planned_path"):
-        # Wir brauchen planned_path — das müssen wir noch ins RouteCheckResult reichen
-        pass  # siehe Schritt 3 unten
 
     return "\n".join(lines)
 
@@ -188,15 +153,80 @@ def _escape_html(text: str) -> str:
 
 
 # ------------------------------------------------------------------------------
-#  Stufe 3: Telegram direkt ansprechen
+#  Stufe 2b: Plain-Text-Nachricht für barto-link bauen
+# ------------------------------------------------------------------------------
+
+def build_push_payload(
+    result: RouteCheckResult,
+    agent_sentence: Optional[str],
+    from_station_name: str,
+    to_station_name: str,
+) -> tuple[str, str]:
+    """Baut Title + Body für die iOS-App via barto-link.
+
+    Im Gegensatz zu Telegram (HTML) brauchen wir hier:
+      - Title:  Eine prägnante Zeile mit Emoji + Status (max ~60 Zeichen)
+      - Body:   Mehrzeiliger Plain-Text mit den Details
+
+    Returns:
+        (title, body) Tuple.
+    """
+    emoji, status_label = STATUS_PRESENTATION.get(
+        result.status,
+        ("❓", "unbekannt"),
+    )
+    line = result.train_line or "?"
+    delay = result.delay_minutes
+
+    # --- Title ---
+    if result.status == TrainStatus.DELAYED and delay > 0:
+        title = f"{emoji} {line} verspätet: +{delay} Min"
+    else:
+        title = f"{emoji} {line} {status_label}"
+
+    # --- Body ---
+    body_lines: list[str] = []
+
+    if result.destination:
+        body_lines.append(f"Richtung: {result.destination}")
+
+    if result.planned_departure:
+        soll = result.planned_departure.strftime("%H:%M")
+        platform = f", Gleis {result.planned_platform}" if result.planned_platform else ""
+
+        if result.status == TrainStatus.DELAYED and result.actual_departure:
+            ist = result.actual_departure.strftime("%H:%M")
+            # Push hat keinen Strikethrough — wir nutzen "→" für Verschiebung
+            body_lines.append(
+                f"Abfahrt: {soll} → {ist} ({from_station_name}{platform})"
+            )
+        elif result.status == TrainStatus.CANCELLED:
+            body_lines.append(
+                f"Geplante Abfahrt: {soll} ({from_station_name}{platform})"
+            )
+        else:
+            body_lines.append(f"Abfahrt: {soll} ({from_station_name}{platform})")
+
+    if to_station_name and result.status != TrainStatus.CANCELLED:
+        body_lines.append(f"Aussteigen: {to_station_name}")
+
+    if result.delay_reason is not None and result.delay_reason.resolved.is_known:
+        body_lines.append(f"Grund: {result.delay_reason.resolved.text}")
+
+    if agent_sentence:
+        body_lines.append("")
+        body_lines.append(agent_sentence)
+
+    body = "\n".join(body_lines)
+    return title, body
+
+
+# ------------------------------------------------------------------------------
+#  Stufe 3a: Telegram direkt ansprechen
 # ------------------------------------------------------------------------------
 
 def send_to_telegram(html_text: str) -> bool:
-    """Schickt vorgefertigten HTML-Text direkt an den Telegram-Bot.
-
-    Nutzt die Telegram-Bot-API via TELEGRAM_BOT_API und TELEGRAM_CHAT_ID
-    aus dem Environment.
-    """
+    """Schickt vorgefertigten HTML-Text direkt an den Telegram-Bot."""
     token = os.environ.get("TELEGRAM_BOT_API")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -231,6 +261,77 @@ def send_to_telegram(html_text: str) -> bool:
 
 
 # ------------------------------------------------------------------------------
+#  Stufe 3b: barto-link Backend ansprechen
+# ------------------------------------------------------------------------------
+
+def send_to_barto_link(
+    title: str,
+    body: str,
+    *,
+    source: str = "dbticker.transit",
+    priority: int = 5,
+) -> bool:
+    """Schickt einen Push an das eigene barto-link Backend.
+
+    Args:
+        title:     Notification-Titel (eine Zeile, sichtbar im Lockscreen-Banner)
+        body:      Notification-Body (mehrzeilig, sichtbar bei Expand)
+        source:    Tag für App-seitige Filterung. Default: 'dbticker.transit'
+        priority:  APNs-Priority (1-10). Default 5 = normal.
+
+    Returns:
+        True bei HTTP 200, False bei jedem Fehler.
+    """
+    backend_url = os.environ.get("BARTO_LINK_URL")
+    api_token = os.environ.get("BARTO_LINK_API_TOKEN")
+
+    if not backend_url or not api_token:
+        logger.error(
+            "barto-link-Send nicht möglich: BARTO_LINK_URL oder "
+            "BARTO_LINK_API_TOKEN fehlt im Environment."
+        )
+        return False
+
+    url = f"{backend_url.rstrip('/')}/push"
+
+    try:
+        r = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "title": title,
+                "body": body,
+                "source": source,
+                "priority": priority,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        sent = data.get("sent_to", 0)
+        failed = data.get("failed", 0)
+
+        if sent == 0:
+            logger.warning(
+                "barto-link akzeptiert, aber 0 Empfänger erreicht (failed=%d).",
+                failed,
+            )
+            return False
+
+        logger.info(
+            "barto-link-Push erfolgreich (sent=%d, failed=%d).",
+            sent, failed,
+        )
+        return True
+    except requests.RequestException as e:
+        logger.error("barto-link-Send fehlgeschlagen: %s", e)
+        return False
+
+
+# ------------------------------------------------------------------------------
 #  Public API: das ist was main.py nutzt
 # ------------------------------------------------------------------------------
 
@@ -241,7 +342,11 @@ def notify(
     from_station_name: str,
     to_station_name: str = "",
 ) -> bool:
-    """Kompletter Notify-Flow: Agent-Satz → HTML bauen → Telegram senden.
+    """Kompletter Notify-Flow: Agent-Satz → Format bauen → Backend senden.
+
+    Backend wird via NOTIFY_BACKEND-Umgebungsvariable gewählt:
+      - 'telegram'   (Default): HTML-Nachricht an Telegram-Bot
+      - 'barto_link': Title + Body an eigene iOS-App via push.barto.cloud
 
     Args:
         result: Das RouteCheckResult vom Checker.
@@ -257,13 +362,31 @@ def notify(
     if not agent_sentence:
         logger.info("Kein Agent-Satz erhalten, sende ohne persönlichen Touch.")
 
-    # --- 2. HTML-Nachricht bauen ---
-    html = build_telegram_html(
-        result,
-        agent_sentence=agent_sentence,
-        from_station_name=from_station_name,
-        to_station_name=to_station_name,
-    )
+    # --- 2. Backend wählen ---
+    backend = os.environ.get("NOTIFY_BACKEND", "telegram").lower()
 
-    # --- 3. An Telegram senden ---
-    return send_to_telegram(html)
+    if backend == "barto_link":
+        # Plain-Text-Format für iOS-Push
+        title, body = build_push_payload(
+            result,
+            agent_sentence=agent_sentence,
+            from_station_name=from_station_name,
+            to_station_name=to_station_name,
+        )
+        logger.debug("Sende via barto-link: title=%r", title)
+        return send_to_barto_link(title=title, body=body, source="dbticker.transit")
+
+    elif backend == "telegram":
+        # HTML-Format für Telegram
+        html = build_telegram_html(
+            result,
+            agent_sentence=agent_sentence,
+            from_station_name=from_station_name,
+            to_station_name=to_station_name,
+        )
+        logger.debug("Sende via Telegram (HTML)")
+        return send_to_telegram(html)
+
+    else:
+        logger.error("Unbekanntes NOTIFY_BACKEND: %r — Push übersprungen.", backend)
+        return False
