@@ -21,6 +21,9 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
+
+BERLIN = ZoneInfo("Europe/Berlin")
 
 from checker import RouteCheckResult, TrainStatus
 
@@ -84,7 +87,7 @@ class RouteState:
 
 def state_path_for(route_id: str, day: Optional[datetime] = None) -> Path:
     """Pfad zur State-Datei einer Route für einen bestimmten Tag."""
-    day = day or datetime.now()
+    day = day or datetime.now(BERLIN)
     date_str = day.strftime("%Y%m%d")
     return STATE_DIR / f"{route_id}_{date_str}.json"
 
@@ -122,7 +125,7 @@ def decide_notification(
     """
     # --- Neuen State aufbauen (kopieren + anpassen) ---
     new_state = RouteState(**asdict(previous_state))
-    new_state.last_check_at = datetime.now().isoformat(timespec="seconds")
+    new_state.last_check_at = datetime.now(BERLIN).isoformat(timespec="seconds")
 
     status = result.status
     delay = result.delay_minutes
@@ -190,8 +193,7 @@ def decide_notification(
         and not previous_state.all_clear_sent
         and result.planned_departure is not None
     ):
-        from datetime import datetime as _dt
-        now = _dt.now(result.planned_departure.tzinfo)
+        now = datetime.now(BERLIN)
         minutes_to_departure = (result.planned_departure - now).total_seconds() / 60
 
         if all_clear_window_end_min <= minutes_to_departure <= all_clear_window_start_min:

@@ -133,17 +133,28 @@ def process_route(
     route_id = route["id"]
     route_label = route["label"]
 
-    # --- Station-Referenz auflösen ---
+    # --- Station-Referenzen auflösen ---
     from_key = route["from_station"]
     if from_key not in stations:
         logger.error("Route %s: Station-Key '%s' nicht in mystations.toml", route_id, from_key)
         return
-
     from_eva = stations[from_key]["eva"]
+
+    via_key = route["via_station"]
+    if via_key not in stations:
+        logger.error("Route %s: via_station-Key '%s' nicht in mystations.toml", route_id, via_key)
+        return
+    via_name = stations[via_key]["name"]
 
     # --- Check ausführen ---
     logger.info("[%s] Starte Check (EVA %d, Abfahrt %s, Linie %s)",
                 route_id, from_eva, route["scheduled_departure"], route["line"])
+
+    via_key = route["via_station"]
+    if via_key not in stations:
+        logger.error("Route %s: via_station-Key '%s' nicht in mystations.toml", route_id, via_key)
+        return
+    via_name = stations[via_key]["name"]
 
     try:
         result = check_route(
@@ -153,7 +164,7 @@ def process_route(
             from_station_eva=from_eva,
             scheduled_departure=route["scheduled_departure"],
             line=route["line"],
-            direction_contains=route["direction_contains"],
+            via_station_name=via_name,
         )
     except Exception as e:
         logger.exception("[%s] Check fehlgeschlagen: %s", route_id, e)

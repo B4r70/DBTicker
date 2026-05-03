@@ -81,45 +81,34 @@ class RouteCheckResult:
 def find_matching_train(
     plan: list[Stop],
     *,
-    scheduled_departure: str,  # Format "HH:MM"
+    scheduled_departure: str,
     line: str,
-    direction_contains: str,
+    via_station_name: str,
 ) -> Optional[Stop]:
     """Sucht im Soll-Fahrplan den Zug, der zur Route passt.
 
     Matching-Kriterien (alle müssen erfüllt sein):
       - Geplante Abfahrtszeit (HH:MM) stimmt exakt
       - Linie stimmt exakt
-      - Zielrichtung enthält den konfigurierten Substring
-
-    Args:
-        plan: Liste aller Stops einer Stunde (von DBClient.fetch_plan).
-        scheduled_departure: z.B. "06:31".
-        line: z.B. "RB23".
-        direction_contains: z.B. "Koblenz" (substring-match auf destination).
-
-    Returns:
-        Der passende Stop oder None.
+      - Geplanter Pfad enthält die Via-Station (substring-match,
+        case-insensitive, damit 'Niederlahnstein' auch 'Niederlahnstein(Lahn)' matcht)
     """
+    via_lower = via_station_name.lower()
+
     for stop in plan:
-        # Planned departure muss vorhanden sein
         if stop.planned_departure is None:
             continue
 
-        # Exakte Abfahrtszeit prüfen
         if stop.planned_departure.strftime("%H:%M") != scheduled_departure:
             continue
 
-        # Linie prüfen
         if stop.line != line:
             continue
 
-        # Richtung prüfen (substring-match, weil Ziele wie "Koblenz Hbf" vs. "Koblenz Stadtmitte" existieren)
-        destination = stop.destination or ""
-        if direction_contains.lower() not in destination.lower():
+        # Hält der Zug irgendwo unterwegs an unserer Via-Station?
+        if not any(via_lower in path_entry.lower() for path_entry in stop.planned_path):
             continue
 
-        # Alle Kriterien erfüllt
         return stop
 
     return None
@@ -217,7 +206,7 @@ def check_route(
     from_station_eva: int,
     scheduled_departure: str,
     line: str,
-    direction_contains: str,
+    via_station_name: str,
 ) -> RouteCheckResult:
     """Vollständige Prüfung einer Route.
 
@@ -230,7 +219,7 @@ def check_route(
         from_station_eva: EVA-Nummer der Abfahrtsstation.
         scheduled_departure: Geplante Abfahrt "HH:MM".
         line: z.B. "RB23".
-        direction_contains: z.B. "Koblenz".
+        via_station_name: z.B. "Niederlahnstein".
 
     Returns:
         RouteCheckResult mit vollständigen Daten.
@@ -253,7 +242,7 @@ def check_route(
         plan,
         scheduled_departure=scheduled_departure,
         line=line,
-        direction_contains=direction_contains,
+        via_station_name=via_station_name,
     )
 
     # Zug nicht gefunden = Problem (andere Linie? Fahrplan geändert? Feiertag?)

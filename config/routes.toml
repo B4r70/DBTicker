@@ -36,7 +36,7 @@ from_station               = "badems"
 to_station                 = "niederlahnstein"
 scheduled_departure        = "06:28"
 line                       = "RB23"
-direction_contains         = "Koblenz"
+via_station                = "niederlahnstein"
 check_window_before_min    = 35
 check_window_after_min     = 5
 alert_threshold_min        = 3
@@ -64,7 +64,7 @@ from_station               = "niederlahnstein"
 to_station                 = "badems"
 scheduled_departure        = "16:16"
 line                       = "RB23"
-direction_contains         = "Nassau"
+via_station                = "badems"
 check_window_before_min    = 25       # ab 15:51 prüfen
 check_window_after_min     = 5
 alert_threshold_min        = 3
@@ -81,3 +81,31 @@ delay_shifts_my_time       = false    # Arbeitsende ist fix, Zug wartet am Bahns
 arrival_destination        = "zu Hause"
 arrival_offset_min         = 0
 max_delay_tracking_min     = 60
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Nachmittag
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id                         = "hin-1625"
+label                      = "🚆 Morgens Bad Ems → Koblenz"
+from_station               = "badems"
+to_station                 = "niederlahnstein"
+scheduled_departure        = "16:25"
+line                       = "RB23"
+via_station                = "niederlahnstein"
+check_window_before_min    = 60
+check_window_after_min     = 5
+alert_threshold_min        = 3
+active_days                = ["mo", "tu", "th", "fr", "su"]
+
+# All-Clear-Fenster: 06:03–06:07 (Kaffee auf der Terrasse, Handy-Check)
+all_clear_window_start_min = 60
+all_clear_window_end_min   = 5
+
+# Tagesablauf-Bezug
+my_departure_time          = "15:45"
+my_departure_label         = "mit dem E-Bike losfahren"
+delay_shifts_my_time       = true     # bei Verspätung: kannst später los
+arrival_destination        = "prosozial"
+arrival_offset_min         = 8        # 3 Min Rad von Niederlahnstein zu prosozial2   
+max_delay_tracking_min     = 30   

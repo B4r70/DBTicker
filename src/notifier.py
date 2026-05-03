@@ -6,6 +6,7 @@
 #  Autor . . . . : Bartosz Stryjewski
 #  Erstellt am . : 21.04.2026
 #  Erweitert am .: 01.05.2026 (barto-link Backend als Alternative zu Telegram)
+#  Erweitert am .: 03.05.2026 (Strukturierte Metadaten via meta-Dict für DetailView)
 # ------------------------------------------------------------------------------------------
 #  Beschreibung  : Notify-Layer mit zwei austauschbaren Backends:
 #                    - "telegram"   → Telegram-Bot, HTML-Format
@@ -222,6 +223,58 @@ def build_push_payload(
 
 
 # ------------------------------------------------------------------------------
+#  Stufe 2c: Strukturierte Metadaten für die iOS-DetailView
+# ------------------------------------------------------------------------------
+
+def build_train_meta(
+    result: RouteCheckResult,
+    from_station_name: str,
+    to_station_name: str,
+) -> dict:
+    """Baut das `meta`-Dict für die iOS-App.
+
+    Der Inhalt landet im APNs-Payload und in StoredNotification —
+    dort liest die DetailView die Felder aus.
+
+    Returns:
+        Dict mit JSON-tauglichen Werten (None-Werte werden ausgelassen).
+    """
+    meta: dict = {
+        "status": result.status.value,
+        "delay_minutes": result.delay_minutes,
+    }
+
+    # Felder nur aufnehmen, wenn vorhanden
+    if result.train_line:
+        meta["train_line"] = result.train_line
+    if result.train_number:
+        meta["train_number"] = result.train_number
+    if result.destination:
+        meta["destination"] = result.destination
+    if result.planned_platform:
+        meta["planned_platform"] = result.planned_platform
+
+    # Datums-Felder als ISO 8601 mit Timezone
+    if result.planned_departure:
+        meta["planned_departure"] = result.planned_departure.isoformat()
+    if result.actual_departure:
+        meta["actual_departure"] = result.actual_departure.isoformat()
+
+    # Verspätungsgrund (resolved aus messagecodes.toml)
+    if result.delay_reason and result.delay_reason.resolved.is_known:
+        meta["delay_reason"] = result.delay_reason.resolved.text
+        meta["delay_reason_severity"] = result.delay_reason.resolved.severity
+
+    # Stationen für Strecken-Sektion in der App
+    if from_station_name:
+        meta["from_station"] = from_station_name
+    if to_station_name:
+        meta["to_station"] = to_station_name
+
+    return meta
+
+
+# ------------------------------------------------------------------------------
 #  Stufe 3a: Telegram direkt ansprechen
 # ------------------------------------------------------------------------------
 
@@ -270,6 +323,7 @@ def send_to_barto_link(
     *,
     source: str = "dbticker.transit",
     priority: int = 5,
+    meta: Optional[dict] = None,
 ) -> bool:
     """Schickt einen Push an das eigene barto-link Backend.
 
@@ -278,6 +332,7 @@ def send_to_barto_link(
         body:      Notification-Body (mehrzeilig, sichtbar bei Expand)
         source:    Tag für App-seitige Filterung. Default: 'dbticker.transit'
         priority:  APNs-Priority (1-10). Default 5 = normal.
+        meta:      Optionale strukturierte Zusatzdaten für die App-DetailView.
 
     Returns:
         True bei HTTP 200, False bei jedem Fehler.
@@ -294,6 +349,16 @@ def send_to_barto_link(
 
     url = f"{backend_url.rstrip('/')}/push"
 
+    # HTTP-Payload schrittweise bauen, damit meta nur eingehängt wird, falls vorhanden
+    http_payload = {
+        "title": title,
+        "body": body,
+        "source": source,
+        "priority": priority,
+    }
+    if meta is not None:
+        http_payload["meta"] = meta
+
     try:
         r = requests.post(
             url,
@@ -301,12 +366,7 @@ def send_to_barto_link(
                 "Authorization": f"Bearer {api_token}",
                 "Content-Type": "application/json",
             },
-            json={
-                "title": title,
-                "body": body,
-                "source": source,
-                "priority": priority,
-            },
+            json=http_payload,
             timeout=10,
         )
         r.raise_for_status()
@@ -366,15 +426,32 @@ def notify(
     backend = os.environ.get("NOTIFY_BACKEND", "telegram").lower()
 
     if backend == "barto_link":
-        # Plain-Text-Format für iOS-Push
+        # Plain-Text-Format für iOS-Push (Title + Body)
         title, body = build_push_payload(
             result,
             agent_sentence=agent_sentence,
             from_station_name=from_station_name,
             to_station_name=to_station_name,
         )
-        logger.debug("Sende via barto-link: title=%r", title)
-        return send_to_barto_link(title=title, body=body, source="dbticker.transit")
+
+        # Strukturierte Metadaten für die DetailView
+        meta = build_train_meta(
+            result,
+            from_station_name=from_station_name,
+            to_station_name=to_station_name,
+        )
+
+        logger.debug(
+            "Sende via barto-link: title=%r, meta_keys=%s",
+            title,
+            list(meta.keys()),
+        )
+        return send_to_barto_link(
+            title=title,
+            body=body,
+            source="dbticker.transit",
+            meta=meta,
+        )
 
     elif backend == "telegram":
         # HTML-Format für Telegram
