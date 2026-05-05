@@ -1,0 +1,92 @@
+# ==============================================================================
+#  # BartoAI
+# ==============================================================================
+#  Abschnitt . . : Tooling/DBTicker
+#  Datei . . . . : pyproject.toml
+#  Autor . . . . : Bartosz Stryjewski
+#  Erstellt am . : 05.05.2026
+# ------------------------------------------------------------------------------
+#  Beschreibung  : Project metadata + dependencies for DBTicker.
+#                  Replaces requirements.txt with PEP 621 standard.
+# ------------------------------------------------------------------------------
+#  (C) Copyright 2026 Bartosz Stryjewski
+#  All rights reserved
+# ==============================================================================
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "dbticker"
+version = "1.0.0"
+description = "Personal commute monitor — tracks Deutsche Bahn delays for configured routes and posts trip events to BartoLink."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Bartosz Stryjewski" },
+]
+
+dependencies = [
+    # DB Timetables API client
+    "deutsche-bahn-api>=1.1.0",
+
+    # HTTP für notifier.py → BartoLink
+    "requests>=2.32.0",
+
+    # .env laden (BARTOLINK_URL, BARTOLINK_TOKEN, DB-API-Credentials)
+    "python-dotenv>=1.0.0",
+
+    # Datum/Zeit-Helpers (z.B. ISO-Parsing)
+    "python-dateutil>=2.9.0",
+
+    # Legacy: mpu (transitive Dep) braucht pkg_resources aus setuptools<70
+    "setuptools<70",
+
+    # TOML-Schreiben (config-Updates, falls genutzt)
+    "tomli-w>=1.0.0",
+]
+
+
+[project.optional-dependencies]
+# Entwicklungs-Tools — nicht in Prod nötig
+dev = [
+    "ruff>=0.5.0",
+    "mypy>=1.10",
+    "pytest>=8.0",
+]
+
+
+[project.scripts]
+# Macht aus `pip install -e .` einen sauberen Entry-Point:
+#   dbticker              → entspricht `python src/main.py`
+#   dbticker --route <id> → Single-Route-Modus
+dbticker = "src.main:main"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+exclude = ["tests*", "tools*", "log*", "state*"]
+
+
+# ------------------------------------------------------------------------------
+#  Optional: Tool-Konfigurationen
+# ------------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Konservative Auswahl — keine Stilkriege
+select = ["E", "F", "W", "I"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true   # für deutsche-bahn-api & andere ohne stubs

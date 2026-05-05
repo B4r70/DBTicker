@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
-from messagecodes import MessageCode, lookup_code
+from src.messagecodes import MessageCode, lookup_code
 
 import requests
 

@@ -24,7 +24,7 @@ from enum import Enum
 
 # Message und primary_reason mitnehmen:
 from typing import Optional
-from db_client import DBClient, Stop, Change, Message, primary_reason, parse_db_timestamp
+from src.db_client import DBClient, Stop, Change, Message, primary_reason, parse_db_timestamp
 
 # ------------------------------------------------------------------------------
 #  Konfiguration

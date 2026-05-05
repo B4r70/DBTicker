@@ -1,0 +1,11 @@
+deutsche-bahn-api>=1.1.0
+requests>=2.32.0
+python-dotenv>=1.0.0
+python-dateutil>=2.9.0
+setuptools<70
+tomli-w>=1.0.0
+
+[dev]
+ruff>=0.5.0
+mypy>=1.10
+pytest>=8.0

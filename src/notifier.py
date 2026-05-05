@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from checker import RouteCheckResult, TrainStatus
+from src.checker import RouteCheckResult, TrainStatus
 
 
 # ------------------------------------------------------------------------------

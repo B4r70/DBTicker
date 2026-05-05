@@ -34,11 +34,11 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
-from checker import RouteCheckResult, TrainStatus, check_route
-from db_client import DBClient
-from state import RouteState, decide_notification, state_path_for
-from notifier import notify
-from logging_setup import configure_logging
+from src.checker import RouteCheckResult, TrainStatus, check_route
+from src.db_client import DBClient
+from src.state import RouteState, decide_notification, state_path_for
+from src.notifier import notify
+from src.logging_setup import configure_logging
 
 
 # ------------------------------------------------------------------------------

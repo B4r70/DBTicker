@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 
 BERLIN = ZoneInfo("Europe/Berlin")
 
-from checker import RouteCheckResult, TrainStatus
+from src.checker import RouteCheckResult, TrainStatus
 
 
 # ------------------------------------------------------------------------------
