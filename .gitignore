@@ -1,3 +1,17 @@
+# ===========================================================================================
+#  # BartoAI
+# ===========================================================================================
+#  Bereich . . . : Tooling/DBTicker
+#  Datei . . . . : .gitignore
+#  Autor . . . . : Bartosz Stryjewski
+#  Erstellt am . : 05.05.2026
+# ------------------------------------------------------------------------------------------
+#  Beschreibung  : Geheime Umgebungsvariablen, die nicht in Git landen sollen.
+# ------------------------------------------------------------------------------------------
+#  (C) Copyright 2026 Bartosz Stryjewski
+#  All rights reserved
+# ===========================================================================================
+#
 # --- Environment / Secrets ---
 .env
 .env.local
@@ -9,6 +23,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 .Python
+*.pyo
+*.pyc
+
+
+# --- Backups ---
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+
+# --- Workspace ---
+workspace/
+*.code-workspace
+*.workspace
 
 # --- Runtime-Daten ---
 state/*.json
@@ -21,12 +50,9 @@ state/*.json
 
 # --- OS ---
 .DS_Store
-._*              # ← NEU: alle AppleDouble-Dateien
+._* 
 Thumbs.db
 
 # --- Runtime / Logs ---
-state/*.json
-!state/.gitkeep
 log/*.log
 !log/.gitkeep
-.env
