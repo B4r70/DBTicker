@@ -187,6 +187,7 @@ def compute_status(train: Stop, changes: dict[str, Change]) -> RouteCheckResult:
             result.status = TrainStatus.DELAYED
         else:
             result.status = TrainStatus.ON_TIME
+            result.delay_minutes = max(0, result.delay_minutes)
 
     # --- Grund ermitteln (in allen Fällen, auch on_time mit Messages) ---
     result.delay_reason = _pick_delay_reason(train, change=change)
