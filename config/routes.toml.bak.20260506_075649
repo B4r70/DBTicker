@@ -81,3 +81,17 @@ delay_shifts_my_time       = true    # Arbeitsende ist fix, Zug wartet am Bahnst
 arrival_destination        = "zu Hause"
 arrival_offset_min         = 0
 max_delay_tracking_min     = 60
+
+[[routes]]
+id = "route-ko-ems-1009"
+label = "🚆 koblenz → badems"
+from_station = "koblenz"
+to_station = "badems"
+via_station = "niederlahnstein"
+scheduled_departure = "10:09"
+line = "RB23"
+active_days = ["mo", "tu", "we", "th", "fr"]
+my_departure_time = "09:55"
+my_departure_label = "Losrennen"
+arrival_destination = "Daheim"
+arrival_offset_min = 10

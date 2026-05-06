@@ -50,35 +50,27 @@ class RouteState:
     last_reported_platform: Optional[str] = None    # NEU: für Gleiswechsel-Erkennung
     notification_count: int = 0                     # Wie oft schon gepingt heute
     first_alert_at: Optional[str] = None            # ISO-String der ersten Alert-Meldung
-    notification_sent_today: bool = False           # Mind. 1 Push heute raus (egal welche Art) - Sicherheit, damit ich weiß, dass es klappt
+    all_clear_sent: bool = False                    # Pünktlich-Info wurde gesendet
 
     @classmethod
     def load(cls, path: Path) -> "RouteState":
         """State aus JSON laden. Fehlende Datei → leerer State.
-    
+
         Defensiv gegen alte State-Files: Felder, die wir noch nicht hatten
         (z.B. last_reported_platform), werden auf Default gesetzt — damit
         State-Files aus der Pre-Sprint-2-Welt weiter funktionieren.
-        Außerdem: Migration von `all_clear_sent` → `notification_sent_today`
-        für bestehende JSON-Files aus der Pre-Sprint-3-Welt.
         """
         if not path.exists():
             return cls()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-    
-            # Migration: Altes Feld auf neuen Namen mappen, falls vorhanden.
-            # Wenn beide Namen drin wären (sollte nicht passieren), gewinnt der neue.
-            if "all_clear_sent" in data and "notification_sent_today" not in data:
-                data["notification_sent_today"] = data.pop("all_clear_sent")
-            else:
-                data.pop("all_clear_sent", None)  # Altfeld in jedem Fall entfernen
-    
             # Nur bekannte Felder annehmen, unbekannte verwerfen.
+            # Damit knallt's nicht, wenn das Schema sich erweitert hat.
             known_fields = {f for f in cls.__dataclass_fields__}
             filtered = {k: v for k, v in data.items() if k in known_fields}
             return cls(**filtered)
         except (json.JSONDecodeError, TypeError) as e:
+            # Defensiv: bei kaputtem State lieber neu anfangen als crashen
             print(f"⚠️  State-Datei {path} defekt ({e}) — starte mit leerem State.")
             return cls()
 
@@ -202,7 +194,7 @@ def decide_notification(
         new_state.last_reported_status = status.value
         new_state.last_reported_delay = 0
         new_state.last_reported_platform = cur_platform
-        new_state.notification_sent_today = True
+        new_state.all_clear_sent = True
         new_state.notification_count += 1
 
         return NotificationDecision(
@@ -215,19 +207,19 @@ def decide_notification(
     # Einmal pro Tag, wenn Zug pünktlich und wir im Zeitfenster sind.
     if (
         status == TrainStatus.ON_TIME
-        and not previous_state.notification_sent_today
+        and not previous_state.all_clear_sent
         and result.planned_departure is not None
     ):
         now = datetime.now(BERLIN)
         minutes_to_departure = (result.planned_departure - now).total_seconds() / 60
-    
+
         if all_clear_window_end_min <= minutes_to_departure <= all_clear_window_start_min:
             new_state.last_reported_status = status.value
             new_state.last_reported_delay = 0
             new_state.last_reported_platform = cur_platform
-            new_state.notification_sent_today = True
+            new_state.all_clear_sent = True
             new_state.notification_count += 1
-    
+
             return NotificationDecision(
                 should_notify=True,
                 reason=f"All-Clear: Zug pünktlich, ~{int(minutes_to_departure)} Min vor Abfahrt.",
@@ -282,7 +274,7 @@ def decide_notification(
             new_state.last_reported_status = status.value
             new_state.last_reported_delay = delay
             new_state.last_reported_platform = cur_platform
-            new_state.notification_sent_today = True
+            new_state.all_clear_sent = True
             new_state.notification_count += 1
             if new_state.first_alert_at is None:
                 new_state.first_alert_at = new_state.last_check_at

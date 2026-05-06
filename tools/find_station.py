@@ -1,20 +1,11 @@
-# ===========================================================================================
-#  # BartoAI
-# ===========================================================================================
-#  Bereich . . . : Tooling/DBTicker
-#  Datei . . . . : find_station.py
-#  Autor . . . . : Bartosz Stryjewski
-#  Erstellt am . : 22.04.2026
-# ------------------------------------------------------------------------------------------
-#  Beschreibung  : Sucht Stationen in der DB-Library nach Namen.
-# ------------------------------------------------------------------------------------------
-#  Nutzung . . . : python tools/find_station.py Lahnstein
-#                  python tools/find_station.py "Bad Ems West"
-#                  python tools/find_station.py Niederlahnstein --add niederlahnstein
-# ------------------------------------------------------------------------------------------
-#  (C) Copyright 2026 Bartosz Stryjewski
-#  All rights reserved
-# ===========================================================================================
+# ==========================================================================
+#  Projektname · tools/find_station.py
+#  ----------------------------------------------------
+#  Findet DB-Stationen anhand eines Namens-Substrings
+#
+#  Autor:  Bartosz Stryjewski
+#  Datum:  06.05.2026
+# ==========================================================================
 #
 import argparse
 import sys

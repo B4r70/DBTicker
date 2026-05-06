@@ -1,17 +1,19 @@
-"""Testskript: Plan an Bad Ems um 12:00 heute prüfen."""
-import sys
-from pathlib import Path
-
-# src importierbar machen
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
+# ==========================================================================
+#  Projektname · tools/test_client.py
+#  ----------------------------------------------------
+#  Testet den DBClient mit einem echten API-Call.
+#
+#  Autor:  Bartosz Stryjewski
+#  Datum:  06.05.2026
+# ==========================================================================
+#
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from db_client import DBClient
+from src.db_client import DBClient
 
 BERLIN = ZoneInfo("Europe/Berlin")
 

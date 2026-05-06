@@ -1,2 +1,3 @@
 [console_scripts]
 dbticker = src.main:main
+dbticker-routes = src.cli.main:main

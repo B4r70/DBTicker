@@ -1,13 +1,17 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
+# ==========================================================================
+#  Projektname · tools/test_checker.py
+#  ----------------------------------------------------
+#  Testet die Checker-Logik mit einem synthetischen RouteCheckResult.
+#
+#  Autor:  Bartosz Stryjewski
+#  Datum:  06.05.2026
+# ==========================================================================
+#
 from dotenv import load_dotenv
 load_dotenv()
 
-from db_client import DBClient
-from checker import check_route
+from src.db_client import DBClient
+from src.checker import check_route
 
 
 client = DBClient()
@@ -21,7 +25,7 @@ result = check_route(
     from_station_eva=8000702,
     scheduled_departure="06:31",
     line="RB23",
-    direction_contains="Koblenz",
+    via_station_name="Koblenz",
 )
 
 print(f"  Status:     {result.status.value}")

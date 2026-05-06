@@ -1,16 +1,19 @@
-"""Testskript für die State-Maschine."""
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
+# ==========================================================================
+#  Projektname · tools/test_state.py
+#  ----------------------------------------------------
+#  Testet die State-Management-Logik mit einem synthetischen RouteCheckResult.
+#
+#  Autor:  Bartosz Stryjewski
+#  Datum:  06.05.2026
+# ==========================================================================
+#
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-from db_client import DBClient
-from checker import check_route
-from state import (
+from src.db_client import DBClient
+from src.checker import check_route
+from src.state import (
     RouteState,
     decide_notification,
     state_path_for,
@@ -27,7 +30,7 @@ result = check_route(
     from_station_eva=8000702,
     scheduled_departure="06:31",
     line="RB23",
-    direction_contains="Koblenz",
+    via_station_name="Niederlahnstein",
 )
 print(f"  Status: {result.status.value}, Verspätung: {result.delay_minutes} Min")
 

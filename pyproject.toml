@@ -47,6 +47,18 @@ dependencies = [
 
     # TOML-Schreiben (config-Updates, falls genutzt)
     "tomli-w>=1.0.0",
+
+    # CLI-Interface (für Single-Route-Checks)
+    "typer>=0.12",
+
+    # Interaktive CLI-Elemente (z.B. Auswahl der Route für Single-Checks)
+    "questionary>=2.0",
+
+    # TOML-Verarbeitung (für komplexere Config-Logik, z.B. Defaults)
+    "tomlkit>=0.13",
+
+    # Schöne Terminal-Ausgaben (z.B. bei Single-Route-Checks)
+    "rich>=13.7",
 ]
 
 
@@ -64,6 +76,7 @@ dev = [
 #   dbticker              → entspricht `python src/main.py`
 #   dbticker --route <id> → Single-Route-Modus
 dbticker = "src.main:main"
+dbticker-routes = "src.cli.main:main"  # NEU
 
 
 [tool.setuptools.packages.find]
