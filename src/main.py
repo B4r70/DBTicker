@@ -191,6 +191,7 @@ def process_route(
             result,
             route_id=route_id,
             current_platform=result.planned_platform,
+            event_intent=decision.intent,
         )
 
         if not success:

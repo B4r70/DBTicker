@@ -32,3 +32,12 @@ verkehr = "FV"
 lat = 50.350929
 lon = 7.588345
 note = ""
+
+[stations.nassau]
+eva = 8004206
+name = "Nassau(Lahn)"
+ds100 = "FNAS"
+verkehr = "RV"
+lat = 50.31148
+lon = 7.800691
+note = ""

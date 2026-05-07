@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, asdict, field
+from typing import Literal, Optional
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -108,13 +108,16 @@ def state_path_for(route_id: str, day: Optional[datetime] = None) -> Path:
 #  Die eigentliche Entscheidungs-Logik
 # ------------------------------------------------------------------------------
 
+NotificationIntent = Literal["regular", "force_push"]
+
 @dataclass
 class NotificationDecision:
-    """Ergebnis der 'Soll ich pingen?'-Entscheidung."""
-
     should_notify: bool
-    reason: str                 # Menschenlesbare Erklärung (für Logs)
-    new_state: "RouteState"     # State, der nach dem Ping gespeichert werden soll
+    reason: str
+    new_state: "RouteState"
+    # NEU: Hint an BartoLink, ob dieser Push den Server-Filter umgehen soll.
+    # "force_push" bei All-Clear/Entwarnung, wo on_time+initial sonst still wäre.
+    intent: NotificationIntent = "regular"
 
 
 def _current_platform(result: RouteCheckResult) -> Optional[str]:
@@ -168,6 +171,7 @@ def decide_notification(
         new_state.last_reported_status = status.value
         new_state.last_reported_platform = cur_platform
         new_state.notification_count += 1
+        new_state.notification_sent_today = True
         if new_state.first_alert_at is None:
             new_state.first_alert_at = new_state.last_check_at
 
@@ -188,6 +192,7 @@ def decide_notification(
 
         new_state.last_reported_status = status.value
         new_state.notification_count += 1
+        new_state.notification_sent_today = True
         if new_state.first_alert_at is None:
             new_state.first_alert_at = new_state.last_check_at
 
@@ -209,6 +214,7 @@ def decide_notification(
             should_notify=True,
             reason="Zug ist wieder pünktlich (nach vorheriger Verspätungsmeldung).",
             new_state=new_state,
+            intent="force_push",
         )
 
     # --- Case 3b: All-Clear-Meldung ~10 Min vor Abfahrt ---
@@ -232,6 +238,7 @@ def decide_notification(
                 should_notify=True,
                 reason=f"All-Clear: Zug pünktlich, ~{int(minutes_to_departure)} Min vor Abfahrt.",
                 new_state=new_state,
+                intent="force_push",
             )
 
     # --- NEU: Case 3c — Gleisänderung (egal bei welchem Status, wenn Wert sich ändert) ---
@@ -246,11 +253,13 @@ def decide_notification(
         new_state.last_reported_delay = delay if status == TrainStatus.DELAYED else 0
         new_state.last_reported_platform = cur_platform
         new_state.notification_count += 1
+        new_state.notification_sent_today = True
 
         return NotificationDecision(
             should_notify=True,
             reason=f"Gleisänderung: Gleis {prev_platform} → Gleis {cur_platform}.",
             new_state=new_state,
+            intent="force_push",
         )
 
     # --- Case 4: Pünktlich und war auch vorher pünktlich (oder noch nichts gemeldet) ---
@@ -307,6 +316,7 @@ def decide_notification(
         new_state.last_reported_delay = delay
         new_state.last_reported_platform = cur_platform
         new_state.notification_count += 1
+        new_state.notification_sent_today = True
 
         trend = "↑" if delay > prev_delay else "↓"
         return NotificationDecision(

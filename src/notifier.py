@@ -41,6 +41,7 @@ def notify(
     *,
     route_id: str,
     current_platform: Optional[str] = None,
+    event_intent: str = "regular", 
 ) -> bool:
     """Schickt einen Trip-Event an BartoLink.
 
@@ -71,6 +72,7 @@ def notify(
     if payload is None:
         # _build_payload hat bereits geloggt warum
         return False
+    payload["event_intent"] = event_intent
 
     url = f"{base_url}/trips/events"
     try:
@@ -106,6 +108,7 @@ def _build_payload(
     *,
     route_id: str,
     current_platform: Optional[str],
+    event_intent: str = "regular",
 ) -> Optional[dict]:
     """Baut das JSON-Payload für POST /trips/events.
 
@@ -169,6 +172,7 @@ def _build_payload(
         "status": status_str,
         "delay_min": delay_min,
         "message": message,
+        "event_intent": event_intent,    # NEU
     }
     # Pydantic-Validierung mag "" für direction nicht (max_length, aber min_length 0 ok)
     # — direction ist ggf. leer wenn destination None war. BartoLink akzeptiert das.
