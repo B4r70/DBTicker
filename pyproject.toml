@@ -59,6 +59,9 @@ dependencies = [
 
     # Schöne Terminal-Ausgaben (z.B. bei Single-Route-Checks)
     "rich>=13.7",
+
+    # Kalender-Check via ICS-Subscription
+    "icalendar>=5.0",
 ]
 
 

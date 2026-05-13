@@ -60,16 +60,3 @@ my_departure_time = "16:00"
 my_departure_label = "prosozial verlassen"
 arrival_destination = "zu Hause"
 arrival_offset_min = 10
-[[routes]]
-id = "route-1016"
-label = "🚆 niederlahnstein → badems"
-from_station = "niederlahnstein"
-to_station = "badems"
-via_station = "badems"
-scheduled_departure = "10:16"
-line = "RB23"
-active_days = ["mo", "tu", "we", "th", "fr"]
-my_departure_time = "10:01"
-my_departure_label = "losfahren"
-arrival_destination = "Zuhause"
-arrival_offset_min = 8

@@ -16,6 +16,7 @@ Requires-Dist: typer>=0.12
 Requires-Dist: questionary>=2.0
 Requires-Dist: tomlkit>=0.13
 Requires-Dist: rich>=13.7
+Requires-Dist: icalendar>=5.0
 Provides-Extra: dev
 Requires-Dist: ruff>=0.5.0; extra == "dev"
 Requires-Dist: mypy>=1.10; extra == "dev"

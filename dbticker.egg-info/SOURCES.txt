@@ -7,6 +7,7 @@ dbticker.egg-info/entry_points.txt
 dbticker.egg-info/requires.txt
 dbticker.egg-info/top_level.txt
 src/__init__.py
+src/calendar_check.py
 src/checker.py
 src/config_defaults.py
 src/db_client.py

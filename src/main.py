@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+from src.calendar_check import get_status_for
 from src.checker import RouteCheckResult, TrainStatus, check_route
 from src.config_defaults import apply_defaults
 from src.db_client import DBClient
@@ -113,6 +114,29 @@ def is_in_check_window(
 
     return window_start <= now <= window_end
 
+# ------------------------------------------------------------------------------
+#  Kalender-Filter
+# ------------------------------------------------------------------------------
+
+def should_skip_for_calendar(now: datetime) -> bool:
+    """Pro Lauf einmal anfragen, ob laut Arbeitskalender Pendeln ansteht.
+
+    "remote" → True (skip), sonst False. "unknown" zählt als kein Override.
+    """
+    check = get_status_for(now.date())
+
+    if check.status == "remote":
+        logger.info(
+            "Kalender: %s — alle Routen werden heute übersprungen",
+            check.matched_summary or check.reason,
+        )
+        return True
+
+    logger.debug(
+        "Kalender: %s — %s",
+        check.status, check.matched_summary or check.reason,
+    )
+    return False
 
 # ------------------------------------------------------------------------------
 #  Pro-Route-Verarbeitung
@@ -227,6 +251,11 @@ def parse_args() -> argparse.Namespace:
             "Für manuelle Refresh-Anforderungen aus BartoLink."
         ),
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Detailliertes Debug-Logging in stdout aktivieren.",
+    )
     return parser.parse_args()
 
 
@@ -236,6 +265,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    # DEBUG-Override muss VOR allen anderen logger-Aufrufen passieren,
+    # sonst sieht man die ersten DEBUG-Nachrichten nicht.
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        for h in logging.getLogger().handlers:
+            h.setLevel(logging.DEBUG)
+        logger.debug("Debug-Logging aktiviert via --debug")
+
     load_dotenv()
 
     now = datetime.now(BERLIN)
@@ -284,6 +322,12 @@ def main() -> int:
         return 0
 
     # --- Modus 2: Alle Routen (systemd-Timer) ---
+    # Kalender einmal vorab prüfen — gilt für alle Routen gleichermaßen,
+    # vermeidet N-fache ICS-Parses pro Lauf.
+    if should_skip_for_calendar(now):
+        logger.info("Fertig (per Kalender geskippt).")
+        return 0
+
     active_count = 0
     for route in routes:
         route_id = route.get("id", "<unnamed>")
