@@ -41,7 +41,8 @@ def notify(
     *,
     route_id: str,
     current_platform: Optional[str] = None,
-    event_intent: str = "regular", 
+    event_intent: str = "regular",
+    minutes_to_departure: Optional[int] = None,
 ) -> bool:
     """Schickt einen Trip-Event an BartoLink.
 
@@ -53,11 +54,16 @@ def notify(
         route_id: dbticker-Route-ID (z.B. "hin-0631").
         current_platform: Aktuelles Gleis (kann sich gegen planned_platform
                           unterscheiden — Gleisänderung).
+        event_intent: 'regular' | 'force_push' | 'silent_observation'.
+                      'silent_observation' = reine Statistik-Beobachtung, kein
+                      sichtbarer Push, kein trip_events-Eintrag in BartoLink.
+        minutes_to_departure: Minuten bis zur planmäßigen Abfahrt zum
+                              Messzeitpunkt. Negativer Wert = Messung nach
+                              planmäßiger Abfahrt.
 
     Returns:
         True, wenn BartoLink das Event akzeptiert hat. False bei Netzwerk-/
-        HTTP-Fehlern. dbticker-main.py nutzt das, um State erst zu speichern,
-        wenn das Event auch wirklich raus war.
+        HTTP-Fehlern.
     """
     base_url = os.environ.get("BARTOLINK_URL", DEFAULT_BARTOLINK_URL).rstrip("/")
     token = os.environ.get("BARTOLINK_TOKEN")
@@ -68,11 +74,19 @@ def notify(
         )
         return False
 
-    payload = _build_payload(result, route_id=route_id, current_platform=current_platform)
+    payload = _build_payload(
+        result,
+        route_id=route_id,
+        current_platform=current_platform,
+        event_intent=event_intent,
+    )
     if payload is None:
         # _build_payload hat bereits geloggt warum
         return False
-    payload["event_intent"] = event_intent
+
+    # minutes_to_departure ist eine reine Analyse-Größe; wird nur durchgereicht
+    # und von BartoLink in trip_observations.minutes_to_departure abgelegt.
+    payload["minutes_to_departure"] = minutes_to_departure
 
     url = f"{base_url}/trips/events"
     try:
@@ -89,10 +103,11 @@ def notify(
 
     response_data = r.json()
     logger.info(
-        "Trip-Event akzeptiert: trip_key=%s, event_type=%s, "
+        "Trip-Event akzeptiert: trip_key=%s, event_type=%s, intent=%s, "
         "push_sent=%s, recipients=%d",
         response_data.get("trip_key"),
         response_data.get("event_type"),
+        event_intent,
         response_data.get("push_sent"),
         response_data.get("push_recipients", 0),
     )
@@ -141,7 +156,9 @@ def _build_payload(
     status_str = status_map.get(result.status, "on_time")
 
     # Verspätung nur bei delayed-Status sinnvoll
-    delay_min: Optional[int] = result.delay_minutes if result.status == TrainStatus.DELAYED else None
+    delay_min: Optional[int] = (
+        result.delay_minutes if result.status == TrainStatus.DELAYED else None
+    )
 
     # Datum aus planned_departure (nicht "heute" — der Zug könnte ja kurz
     # vor Mitternacht abfahren und der Check nach Mitternacht laufen)
@@ -172,7 +189,7 @@ def _build_payload(
         "status": status_str,
         "delay_min": delay_min,
         "message": message,
-        "event_intent": event_intent,    # NEU
+        "event_intent": event_intent,
     }
     # Pydantic-Validierung mag "" für direction nicht (max_length, aber min_length 0 ok)
     # — direction ist ggf. leer wenn destination None war. BartoLink akzeptiert das.

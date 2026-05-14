@@ -15,6 +15,7 @@ import sys
 import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -114,6 +115,7 @@ def is_in_check_window(
 
     return window_start <= now <= window_end
 
+
 # ------------------------------------------------------------------------------
 #  Kalender-Filter
 # ------------------------------------------------------------------------------
@@ -137,6 +139,26 @@ def should_skip_for_calendar(now: datetime) -> bool:
         check.status, check.matched_summary or check.reason,
     )
     return False
+
+
+# ------------------------------------------------------------------------------
+#  Helper: Minuten bis zur planmäßigen Abfahrt
+# ------------------------------------------------------------------------------
+
+def _minutes_to_departure(
+    planned_departure: Optional[datetime],
+    measured_at: datetime,
+) -> Optional[int]:
+    """Berechnet, wie viele Minuten zum Messzeitpunkt noch bis zur planmäßigen
+    Abfahrt sind. Negativer Wert = Messung erfolgte nach planmäßiger Abfahrt.
+
+    Returns None, wenn planned_departure nicht bekannt ist (z.B. bei not_found).
+    """
+    if planned_departure is None:
+        return None
+    delta = planned_departure - measured_at
+    return int(delta.total_seconds() // 60)
+
 
 # ------------------------------------------------------------------------------
 #  Pro-Route-Verarbeitung
@@ -209,6 +231,22 @@ def process_route(
         route_id, decision.should_notify, decision.reason,
     )
 
+    # --- Silent observation für Statistik (best-effort, nie blockierend) ---
+    # Geht IMMER raus, unabhängig von decision.should_notify. BartoLink legt
+    # die Messung in trip_observations ab und aktualisiert trip_updates,
+    # erzeugt aber kein trip_event und keinen Push.
+    minutes_to_dep = _minutes_to_departure(result.planned_departure, now)
+    obs_ok = notify(
+        result,
+        route_id=route_id,
+        current_platform=result.planned_platform,
+        event_intent="silent_observation",
+        minutes_to_departure=minutes_to_dep,
+    )
+    if not obs_ok:
+        # Beobachtung verloren — kein Drama, weiter mit Notify-Pfad.
+        logger.warning("[%s] Silent observation an BartoLink fehlgeschlagen.", route_id)
+
     # --- Notifier ggf. aufrufen ---
     if decision.should_notify:
         success = notify(
@@ -216,6 +254,7 @@ def process_route(
             route_id=route_id,
             current_platform=result.planned_platform,
             event_intent=decision.intent,
+            minutes_to_departure=minutes_to_dep,
         )
 
         if not success:

@@ -61,19 +61,16 @@ my_departure_label = "prosozial verlassen"
 arrival_destination = "zu Hause"
 arrival_offset_min = 10
 
-# -------------------------------------------------------------------------------------------
-# - Vorgaben für die Rückfahrt am Abend, wenn der Zug zu spät ist (damit ich nicht zu früh losfahre)
-# -------------------------------------------------------------------------------------------   
 [[routes]]
-id = "route-1543"
-label = "🚆 DZA niederlahnstein → badems"
+id = "route-1116"
+label = "🚆 niederlahnstein → badems"
 from_station = "niederlahnstein"
 to_station = "badems"
 via_station = "badems"
-scheduled_departure = "15:43"
+scheduled_departure = "11:16"
 line = "RB23"
-active_days = ["we"]
-my_departure_time = "15:30"
-my_departure_label = "loslaufen"
+active_days = ["mo", "tu", "we", "th", "fr"]
+my_departure_time = "11:00"
+my_departure_label = "losfahren"
 arrival_destination = "Zuhause"
-arrival_offset_min = 10
+arrival_offset_min = 8
