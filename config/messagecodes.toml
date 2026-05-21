@@ -143,6 +143,11 @@ text     = "Vorheriger Infrastruktur-Unternehmer"
 category = "other_infra"
 severity = "medium"
 
+[codes.43]
+text     = "Verspätung eines vorausfahrenden Zuges"
+category = "train_sequencing"
+severity = "medium"
+
 [codes.46]
 text     = "Anlagen DB Energie"
 category = "infrastructure"
@@ -341,4 +346,20 @@ severity = "medium"
 [codes.96]
 text     = "Ursache in Untersuchung"
 category = "unknown"
+severity = "low"
+
+#  97-99  Sekundärgründe (Folgeketten)
+[codes.97]
+text     = "Verspätung wegen Anschlussaufnahme"
+category = "train_sequencing"
+severity = "medium"
+
+[codes.98]
+text     = "Verspätung eines vorausfahrenden Zuges"
+category = "train_sequencing"
+severity = "medium"
+
+[codes.99]
+text     = "Folgeverspätung"
+category = "train_sequencing"
 severity = "low"

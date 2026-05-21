@@ -179,6 +179,7 @@ def decide_notification(
             should_notify=True,
             reason="Zug ist ausgefallen.",
             new_state=new_state,
+            intent="force_push",
         )
 
     # --- Case 2: Zug nicht im Plan gefunden ---
@@ -200,6 +201,7 @@ def decide_notification(
             should_notify=True,
             reason="Zug im Plan nicht gefunden (Linienänderung? Feiertag?).",
             new_state=new_state,
+            intent="force_push",
         )
 
     # --- Case 3: On-Time Rückkehr nach vorheriger Verspätung (Entwarnung) ---
@@ -300,6 +302,7 @@ def decide_notification(
                 should_notify=True,
                 reason=f"Erste Verspätungsmeldung: {delay} Min.",
                 new_state=new_state,
+                intent="force_push",
             )
 
         # Folgemeldung: nur bei signifikanter Änderung
@@ -323,6 +326,7 @@ def decide_notification(
             should_notify=True,
             reason=f"Update: {prev_delay} → {delay} Min {trend}.",
             new_state=new_state,
+            intent="force_push",
         )
 
     # --- Fallback (sollte nie erreicht werden) ---

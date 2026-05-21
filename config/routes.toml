@@ -62,18 +62,55 @@ arrival_destination = "zu Hause"
 arrival_offset_min = 10
 
 # -------------------------------------------------------------------------------------------
-# - Vorgaben für die Rückfahrt am Abend, wenn der Zug zu spät ist (damit ich nicht zu früh losfahre)
-# -------------------------------------------------------------------------------------------   
+# - Vorgaben für die Rückfahrt am Abend
+# -------------------------------------------------------------------------------------------
 [[routes]]
-id = "route-1543"
-label = "🚆 DZA niederlahnstein → badems"
+id = "route-1316"
+label = "🚆 niederlahnstein → badems"
 from_station = "niederlahnstein"
 to_station = "badems"
 via_station = "badems"
-scheduled_departure = "15:43"
+scheduled_departure = "13:16"
 line = "RB23"
-active_days = ["we"]
-my_departure_time = "15:30"
+active_days = ["mo", "tu", "we", "th", "fr"]
+alert_threshold_min = 1
+my_departure_time = "13:10"
+my_departure_label = "loslaufen"
+arrival_destination = "Zuhause"
+arrival_offset_min = 10
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Abend
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id = "route-1434"
+label = "🚆 niederlahnstein → badems"
+from_station = "niederlahnstein"
+to_station = "badems"
+via_station = "badems"
+scheduled_departure = "14:34"
+line = "RB23"
+active_days = ["mo", "tu", "we", "th", "fr"]
+alert_threshold_min = 0
+my_departure_time = "14:00"
+my_departure_label = "loslaufen"
+arrival_destination = "Zuhause"
+arrival_offset_min = 10
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Abend
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id = "route-1504"
+label = "🚆 niederlahnstein → badems"
+from_station = "niederlahnstein"
+to_station = "badems"
+via_station = "badems"
+scheduled_departure = "15:04"
+line = "RE25"
+active_days = ["mo", "tu", "we", "th", "fr"]
+alert_threshold_min = 0
+my_departure_time = "14:45"
 my_departure_label = "loslaufen"
 arrival_destination = "Zuhause"
 arrival_offset_min = 10

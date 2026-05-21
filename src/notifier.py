@@ -1,5 +1,5 @@
 # ==========================================================================
-#  Projektname · src/notifier.py
+#  DBTicker · src/notifier.py
 #  ----------------------------------------------------
 #  Benachrichtigungs-Manager: Sendet Alerts via Push
 #
@@ -166,13 +166,13 @@ def _build_payload(
     departure_time = result.planned_departure.astimezone(BERLIN).strftime("%H:%M")
 
     # Verspätungs-Grund als Message-Text (falls bekannt)
+    # Priorität: 1. messagecodes.toml-Text, 2. ext-Freitext der DB-API
     message: Optional[str] = None
-    if (
-        result.delay_reason is not None
-        and hasattr(result.delay_reason, "resolved")
-        and result.delay_reason.resolved.is_known
-    ):
-        message = result.delay_reason.resolved.text
+    if result.delay_reason is not None:
+        if result.delay_reason.resolved.is_known:
+            message = result.delay_reason.resolved.text
+        elif result.delay_reason.external_text:
+            message = result.delay_reason.external_text
 
     payload: dict = {
         "train_number": str(result.train_number),
