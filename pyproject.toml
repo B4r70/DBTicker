@@ -101,6 +101,10 @@ target-version = "py312"
 select = ["E", "F", "W", "I"]
 ignore = []
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true

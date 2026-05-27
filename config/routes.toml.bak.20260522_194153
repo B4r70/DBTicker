@@ -55,8 +55,26 @@ via_station = "badems"
 scheduled_departure = "16:16"
 line = "RB23"
 active_days = ["mo", "tu", "we", "th", "fr"]
-alert_threshold_min = 1
-my_departure_time = "15:40"
+alert_threshold_min = 2
+my_departure_time = "16:00"
 my_departure_label = "prosozial verlassen"
 arrival_destination = "zu Hause"
+arrival_offset_min = 10
+
+# -------------------------------------------------------------------------------------------
+# - Vorgaben für die Rückfahrt am Abend
+# -------------------------------------------------------------------------------------------
+[[routes]]
+id = "theradog-0916"
+label = "🚆 TheraDog Bad Ems -> Nassau"
+from_station = "niederlahnstein"
+to_station = "nassau"
+via_station = "nassau"
+scheduled_departure = "09:16"
+line = "RB23"
+active_days = ["sa"]
+alert_threshold_min = 2
+my_departure_time = "08:50"
+my_departure_label = "Ab nach Nassau"
+arrival_destination = "Ella"
 arrival_offset_min = 10
