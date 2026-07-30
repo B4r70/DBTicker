@@ -31,6 +31,10 @@ BERLIN = ZoneInfo("Europe/Berlin")
 DEFAULT_BARTOLINK_URL = "http://127.0.0.1:8765"
 HTTP_TIMEOUT_SECONDS = 10
 
+# Ab dieser Lücke zur nächsten Fahrt gehen wir von Ersatzverkehr aus.
+# Der RB23-Takt liegt tagsüber bei ~30 Min; 20 Min sind schon auffällig.
+LUECKE_FUER_ERSATZVERKEHR_MIN = 20
+
 
 # ------------------------------------------------------------------------------
 #  Public API
@@ -113,6 +117,150 @@ def notify(
     )
     return True
 
+
+
+# ------------------------------------------------------------------------------
+#  Meldung, wenn gar kein Zug fährt
+# ------------------------------------------------------------------------------
+
+def notify_no_train(
+    result: RouteCheckResult,
+    *,
+    route_label: str,
+    scheduled_departure: str,
+    via_station_name: str,
+) -> bool:
+    """Meldet über /push, dass zur geplanten Zeit kein Zug fährt.
+
+    Bewusst NICHT über /trips/events: Ein Trip-Event braucht eine Zugnummer für
+    den trip_key, und die gibt es in diesem Fall per Definition nicht. Genau
+    daran ist die Meldung bisher stillschweigend gescheitert — der Ticker hat
+    wochenlang jeden Morgen 'not_found' erkannt und nichts davon gesendet.
+
+    Args:
+        result: Check-Ergebnis mit Status NOT_FOUND.
+        route_label: Menschenlesbarer Routenname aus routes.toml.
+        scheduled_departure: Die geplante Abfahrt "HH:MM", die nicht existiert.
+        via_station_name: Zielrichtung, für den Meldungstext.
+
+    Returns:
+        True, wenn BartoLink den Push angenommen hat.
+    """
+    base_url = os.environ.get("BARTOLINK_URL", DEFAULT_BARTOLINK_URL).rstrip("/")
+    token = os.environ.get("BARTOLINK_TOKEN")
+
+    if not token:
+        logger.error("BARTOLINK_TOKEN fehlt im Environment — Push nicht möglich.")
+        return False
+
+    titel, text, meta = build_no_train_message(
+        result,
+        route_label=route_label,
+        scheduled_departure=scheduled_departure,
+        via_station_name=via_station_name,
+    )
+
+    nutzlast = {
+        "title": titel,
+        "body": text,
+        "source": "dbticker",
+        "priority": 10,
+        "meta": meta,
+    }
+
+    try:
+        r = requests.post(
+            f"{base_url}/push",
+            json=nutzlast,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=HTTP_TIMEOUT_SECONDS,
+        )
+        # 404 = kein Gerät registriert. Kein Grund für einen Stacktrace, aber
+        # auch kein Erfolg — sonst würde der State gespeichert und die Meldung
+        # nie nachgeholt.
+        if r.status_code == 404:
+            logger.warning("Push nicht zugestellt: keine aktiven Empfänger registriert.")
+            return False
+        r.raise_for_status()
+    except requests.RequestException as e:
+        logger.error("Push an BartoLink fehlgeschlagen: %s", e)
+        return False
+
+    daten = r.json()
+    logger.info(
+        "Push gesendet (%s): %d Empfänger, %d fehlgeschlagen",
+        titel, daten.get("sent_to", 0), daten.get("failed", 0),
+    )
+    return True
+
+
+def build_no_train_message(
+    result: RouteCheckResult,
+    *,
+    route_label: str,
+    scheduled_departure: str,
+    via_station_name: str,
+) -> tuple[str, str, dict]:
+    """Baut Titel, Text und Meta für die Kein-Zug-Meldung.
+
+    Reine Funktion ohne I/O — deshalb direkt testbar.
+
+    Returns:
+        (titel, text, meta)
+    """
+    # Wie lange klafft die Lücke bis zur nächsten echten Fahrt? Genau da hinein
+    # fallen die Ersatzbusse — die stehen in keiner Fahrplan-API, weil sie
+    # keine EVA-Nummer haben.
+    luecke_min: Optional[int] = None
+    naechste = result.next_to_destination
+    if naechste is not None:
+        stunde, minute = (int(t) for t in scheduled_departure.split(":"))
+        geplant = naechste.planned_departure.replace(
+            hour=stunde, minute=minute, second=0, microsecond=0
+        )
+        luecke_min = int((naechste.planned_departure - geplant).total_seconds() / 60)
+
+    # Ersatzverkehr ist wahrscheinlich, wenn gar nichts fährt oder die nächste
+    # Fahrt deutlich später liegt als ein normaler Taktabstand.
+    ersatzverkehr = result.likely_replacement_service or (
+        luecke_min is not None and luecke_min >= LUECKE_FUER_ERSATZVERKEHR_MIN
+    )
+
+    titel = f"Kein Zug um {scheduled_departure}"
+    teile = [f"{route_label}: Um {scheduled_departure} fährt kein Zug."]
+
+    if naechste is not None:
+        teile.append(
+            f"Nächste Fahrt Richtung {via_station_name}: "
+            f"{naechste.line or '?'} {naechste.train_number or '?'} um "
+            f"{naechste.planned_departure.strftime('%H:%M')}"
+            + (f" ({luecke_min} Min später)." if luecke_min else ".")
+        )
+    else:
+        teile.append(
+            f"Im geprüften Zeitfenster fährt überhaupt keiner Richtung "
+            f"{via_station_name}."
+        )
+
+    if ersatzverkehr:
+        titel = f"Ersatzverkehr? Kein Zug um {scheduled_departure}"
+        teile.append(
+            "Bei Schienenersatzverkehr fahren Busse, die nicht in den "
+            "Fahrplandaten stehen — bitte Reiseauskunft prüfen."
+        )
+
+    text = " ".join(teile)
+
+    meta = {
+        "route_id": result.route_id,
+        "status": result.status.value,
+        "scheduled_departure": scheduled_departure,
+        "likely_replacement_service": ersatzverkehr,
+        "gap_minutes": luecke_min,
+        "connections_in_window": result.connections_in_window,
+    }
+
+    return titel, text, meta
 
 # ------------------------------------------------------------------------------
 #  Payload-Bauer

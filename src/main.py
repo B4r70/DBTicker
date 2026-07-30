@@ -25,7 +25,7 @@ from src.checker import RouteCheckResult, TrainStatus, check_route
 from src.config_defaults import apply_defaults
 from src.db_client import DBClient
 from src.state import RouteState, decide_notification, state_path_for
-from src.notifier import notify
+from src.notifier import notify, notify_no_train
 from src.logging_setup import configure_logging
 
 
@@ -243,7 +243,9 @@ def process_route(
     # die Messung in trip_observations ab und aktualisiert trip_updates,
     # erzeugt aber kein trip_event und keinen Push.
     minutes_to_dep = _minutes_to_departure(result.planned_departure, now)
-    obs_ok = notify(
+    # Ohne Zugnummer lässt sich kein trip_key bilden — die Beobachtung würde
+    # zwangsläufig scheitern. Der Fall wird unten über /push gemeldet.
+    obs_ok = result.train_number is None or notify(
         result,
         route_id=route_id,
         current_platform=result.planned_platform,
@@ -256,13 +258,22 @@ def process_route(
 
     # --- Notifier ggf. aufrufen ---
     if decision.should_notify:
-        success = notify(
-            result,
-            route_id=route_id,
-            current_platform=result.planned_platform,
-            event_intent=decision.intent,
-            minutes_to_departure=minutes_to_dep,
-        )
+        if result.train_number is None:
+            # Kein Zug gefunden: Meldung ohne Trip-Bezug über /push.
+            success = notify_no_train(
+                result,
+                route_label=route_label,
+                scheduled_departure=route["scheduled_departure"],
+                via_station_name=via_name,
+            )
+        else:
+            success = notify(
+                result,
+                route_id=route_id,
+                current_platform=result.planned_platform,
+                event_intent=decision.intent,
+                minutes_to_departure=minutes_to_dep,
+            )
 
         if not success:
             # Bei Fehlschlag State NICHT speichern, damit beim nächsten Lauf

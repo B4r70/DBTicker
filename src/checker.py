@@ -9,8 +9,9 @@
 #
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from enum import Enum
 
@@ -21,6 +22,8 @@ from src.db_client import DBClient, Stop, Change, Message, primary_reason, parse
 # ------------------------------------------------------------------------------
 #  Konfiguration
 # ------------------------------------------------------------------------------
+
+logger = logging.getLogger(__name__)
 
 BERLIN = ZoneInfo("Europe/Berlin")
 
@@ -53,6 +56,24 @@ class RouteCheckResult:
     delay_minutes: int = 0
     planned_platform: Optional[str] = None
     delay_reason: Optional[Message] = None
+
+    # Nur bei NOT_FOUND gesetzt — Kontext für die Meldung:
+    # Der nächste Zug der Linie, der überhaupt zur Via-Station fährt.
+    # None heißt: in diesem und im nächsten Stundenfenster fährt gar keiner.
+    next_to_destination: Optional[Stop] = None
+    # Wie viele Fahrten der Linie zur Via-Station im geprüften Fenster liegen.
+    connections_in_window: int = 0
+
+    @property
+    def likely_replacement_service(self) -> bool:
+        """Deutet der Befund auf Schienenersatzverkehr hin?
+
+        Wenn die Route nicht gefunden wird und im geprüften Fenster gar keine
+        Fahrt der Linie zum Ziel liegt, fährt dort schlicht kein Zug — der
+        typische Fall bei Ersatzverkehr, denn Busse haben keine EVA-Nummer und
+        tauchen in der Timetables-API überhaupt nicht auf.
+        """
+        return self.status == TrainStatus.NOT_FOUND and self.connections_in_window == 0
     # ... weitere Felder später bei Bedarf
 
     @property
@@ -70,6 +91,37 @@ class RouteCheckResult:
 #  Zug-Identifikation im Plan
 # ------------------------------------------------------------------------------
 
+def find_connections(
+    plan: list[Stop],
+    *,
+    line: str,
+    via_station_name: str,
+) -> list[Stop]:
+    """Alle Abfahrten der Linie, die zur Via-Station führen — OHNE Zeitfilter.
+
+    Kriterien:
+      - Es gibt eine Abfahrt (Züge, die hier enden, haben keine)
+      - Linie stimmt exakt
+      - Geplanter Pfad enthält die Via-Station (substring-match,
+        case-insensitive, damit 'Niederlahnstein' auch 'Niederlahnstein(Lahn)' matcht)
+
+    Ohne den Zeitfilter lassen sich drei Fälle unterscheiden, die sonst alle
+    als 'nicht gefunden' zusammenfallen: Fahrplan verschoben, gar keine
+    Verbindung (→ Ersatzverkehr), oder Treffer.
+
+    Returns:
+        Nach geplanter Abfahrt sortierte Liste.
+    """
+    via_lower = via_station_name.lower()
+    treffer = [
+        stop for stop in plan
+        if stop.planned_departure is not None
+        and stop.line == line
+        and any(via_lower in eintrag.lower() for eintrag in stop.planned_path)
+    ]
+    return sorted(treffer, key=lambda s: s.planned_departure)
+
+
 def find_matching_train(
     plan: list[Stop],
     *,
@@ -79,29 +131,11 @@ def find_matching_train(
 ) -> Optional[Stop]:
     """Sucht im Soll-Fahrplan den Zug, der zur Route passt.
 
-    Matching-Kriterien (alle müssen erfüllt sein):
-      - Geplante Abfahrtszeit (HH:MM) stimmt exakt
-      - Linie stimmt exakt
-      - Geplanter Pfad enthält die Via-Station (substring-match,
-        case-insensitive, damit 'Niederlahnstein' auch 'Niederlahnstein(Lahn)' matcht)
+    Wie find_connections(), zusätzlich mit exakter Abfahrtszeit (HH:MM).
     """
-    via_lower = via_station_name.lower()
-
-    for stop in plan:
-        if stop.planned_departure is None:
-            continue
-
-        if stop.planned_departure.strftime("%H:%M") != scheduled_departure:
-            continue
-
-        if stop.line != line:
-            continue
-
-        # Hält der Zug irgendwo unterwegs an unserer Via-Station?
-        if not any(via_lower in path_entry.lower() for path_entry in stop.planned_path):
-            continue
-
-        return stop
+    for stop in find_connections(plan, line=line, via_station_name=via_station_name):
+        if stop.planned_departure.strftime("%H:%M") == scheduled_departure:
+            return stop
 
     return None
 
@@ -238,12 +272,38 @@ def check_route(
         via_station_name=via_station_name,
     )
 
-    # Zug nicht gefunden = Problem (andere Linie? Fahrplan geändert? Feiertag?)
+    # Zug nicht gefunden. Bevor wir das als reines Problem melden: Fährt die
+    # Linie hier überhaupt noch zum Ziel? Dafür die Folgestunde dazunehmen —
+    # bei Ersatzverkehr klafft oft eine Lücke von ein bis zwei Stunden.
+    # Der Extra-Call fällt nur in diesem Ausnahmefall an, nicht im Normalbetrieb.
     if train is None:
+        fenster = list(plan)
+        try:
+            fenster += client.fetch_plan(
+                eva=from_station_eva, at=target_time + timedelta(hours=1)
+            )
+        except Exception as e:
+            logger.warning("Folgestunde für %s nicht abrufbar: %s", route_id, e)
+
+        verbindungen = find_connections(
+            fenster, line=line, via_station_name=via_station_name
+        )
+        naechste = next(
+            (s for s in verbindungen if s.planned_departure >= target_time), None
+        )
+
+        logger.info(
+            "[%s] Kein Zug um %s. Fahrten der Linie %s Richtung %s im Fenster: %d%s",
+            route_id, scheduled_departure, line, via_station_name, len(verbindungen),
+            f" (nächste {naechste.planned_departure.strftime('%H:%M')})" if naechste else "",
+        )
+
         return RouteCheckResult(
             route_id=route_id,
             route_label=route_label,
             status=TrainStatus.NOT_FOUND,
+            next_to_destination=naechste,
+            connections_in_window=len(verbindungen),
         )
 
     # --- 3. Changes holen ---
