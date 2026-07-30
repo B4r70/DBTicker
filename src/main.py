@@ -171,8 +171,15 @@ def process_route(
     now: datetime,
     *,
     previous_state: RouteState,
-) -> None:
-    """Eine einzelne Route durchprüfen und ggf. benachrichtigen."""
+) -> bool:
+    """Eine einzelne Route durchprüfen und ggf. benachrichtigen.
+
+    Returns:
+        True, wenn der Check durchlief und der State geschrieben wurde.
+        False bei jedem Abbruch. Der Single-Route-Modus reicht das als
+        Exit-Code 3 nach außen — sonst wertet BartoLink einen stillen
+        Fehlschlag als erfolgreichen Refresh und zeigt alte Daten als neu.
+    """
     route_id = route["id"]
     route_label = route["label"]
 
@@ -180,7 +187,7 @@ def process_route(
     from_key = route["from_station"]
     if from_key not in stations:
         logger.error("Route %s: Station-Key '%s' nicht in mystations.toml", route_id, from_key)
-        return
+        return False
     from_eva = stations[from_key]["eva"]
 
     via_key = route["via_station"]
@@ -189,7 +196,7 @@ def process_route(
             "Route %s: via_station-Key '%s' nicht in mystations.toml",
             route_id, via_key,
         )
-        return
+        return False
     via_name = stations[via_key]["name"]
 
     # --- Check ausführen ---
@@ -210,7 +217,7 @@ def process_route(
         )
     except Exception as e:
         logger.exception("[%s] Check fehlgeschlagen: %s", route_id, e)
-        return
+        return False
 
     logger.info(
         "[%s] Status: %s, Verspätung: %d Min",
@@ -261,12 +268,13 @@ def process_route(
             # Bei Fehlschlag State NICHT speichern, damit beim nächsten Lauf
             # nochmal versucht wird.
             logger.warning("[%s] Notify fehlgeschlagen — State nicht aktualisiert", route_id)
-            return
+            return False
 
     # --- State speichern ---
     state_path = state_path_for(route_id, now)
     decision.new_state.save(state_path)
     logger.debug("[%s] State gespeichert: %s", route_id, state_path)
+    return True
 
 
 # ------------------------------------------------------------------------------
@@ -355,7 +363,11 @@ def main() -> int:
         # der User hat ja explizit per Refresh-Button gefragt.
         state_path = state_path_for(route["id"], now)
         previous_state = RouteState.load(state_path)
-        process_route(client, route, stations, now, previous_state=previous_state)
+        ok = process_route(client, route, stations, now, previous_state=previous_state)
+
+        if not ok:
+            logger.error("Fertig (Single-Route) — Check fehlgeschlagen.")
+            return 3
 
         logger.info("Fertig (Single-Route).")
         return 0
